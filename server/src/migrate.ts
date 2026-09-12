@@ -3,7 +3,9 @@ import { pool } from './db.js';
 import { databaseUrl } from './config.js';
 
 databaseUrl();
-const sql = await readFile(new URL('../migrations/001_presence.sql', import.meta.url), 'utf8');
-await pool.query(sql);
+for (const migration of ['001_presence.sql', '002_challenges.sql']) {
+  const sql = await readFile(new URL(`../migrations/${migration}`, import.meta.url), 'utf8');
+  await pool.query(sql);
+}
 await pool.end();
-console.log('Presence migration applied.');
+console.log('Tiger Data migrations applied.');

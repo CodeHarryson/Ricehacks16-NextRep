@@ -11,8 +11,9 @@ actual implemented-versus-planned status are in the [implementation plan](docs/I
 ## Setup
 
 Use Node 24 (validated with 24.18.0) and npm (validated with 11.16.0).
-Node must be at least 20.19.4. No environment variables, backend or Expo account
-are needed for local builds. Do not use Expo Go; custom native code requires a
+Node must be at least 20.19.4. The base app can run without Tiger Data, but the
+nearby map requires the presence server, a Tiger Data connection, and
+`EXPO_PUBLIC_API_URL`. Do not use Expo Go; custom native code requires a
 development build. No frames are uploaded, recorded or stored by this scaffold.
 
 ```sh
@@ -145,6 +146,10 @@ ID stored locally until authentication exists. This is demo-only behavior, not
 identity or access control. Presence is foreground-only, expires after 60 seconds,
 and is quantized before other users see it; use `npm run --prefix server cleanup`
 for scheduled expired-row cleanup.
+
+One-device API/map-path testing is complete. Two-device proximity testing remains
+planned for the next stage. The demo API accepts client-generated demo user IDs;
+these are not production authentication.
 
 ## First real-phone test: camera → landmarks
 

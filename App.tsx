@@ -4,14 +4,17 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Action, Card, styles } from './src/components/ui';
 import { ProgressionScreen } from './src/features/progression/ProgressionScreen';
 import { MapScreen } from './src/features/location/MapScreen';
+import { ChallengeScreen } from './src/features/challenge/ChallengeScreen';
+import type { NearbyUser } from './src/features/location/api';
 import { WorkoutScreen } from './src/features/workout/WorkoutScreen';
 
 export default function App() {
-  const [screen, setScreen] = useState<'home' | 'workout' | 'progression' | 'map'>('home');
+  const [screen, setScreen] = useState<'home' | 'workout' | 'progression' | 'map' | 'challenge'>('home');
+  const [challengeOpponent, setChallengeOpponent] = useState<NearbyUser | null>(null);
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (screen === 'home') return false;
-      setScreen('home'); return true;
+      setScreen(screen === 'challenge' ? 'map' : 'home'); return true;
     });
     return () => listener.remove();
   }, [screen]);
@@ -29,7 +32,7 @@ export default function App() {
         <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
         <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : <MapScreen />}
+        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} />}
       </>}
     </ScrollView>
   </SafeAreaView></SafeAreaProvider>;

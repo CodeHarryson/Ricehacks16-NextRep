@@ -13,5 +13,5 @@ export function haversineMeters(a: Coordinates, b: Coordinates): number {
 
 export function shouldPublishLocation(previous: { coordinates: Coordinates; sentAt: number } | null, next: Coordinates, now: number): boolean {
   if (previous === null) return true;
-  return now - previous.sentAt >= LOCATION_CONFIG.presenceUpdateIntervalMs && haversineMeters(previous.coordinates, next) >= LOCATION_CONFIG.minimumMovementMeters;
+  return now - previous.sentAt >= LOCATION_CONFIG.presenceUpdateIntervalMs || haversineMeters(previous.coordinates, next) >= LOCATION_CONFIG.minimumMovementMeters;
 }

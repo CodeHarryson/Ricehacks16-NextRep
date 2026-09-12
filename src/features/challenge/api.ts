@@ -1,0 +1,44 @@
+import type { NearbyUser } from '../location/api';
+
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+export type ChallengeStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+export interface Challenge {
+  challengeId: string;
+  senderId: string;
+  receiverId: string;
+  senderDisplayName: string;
+  receiverDisplayName: string;
+  status: ChallengeStatus;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  proximityMeters: number;
+}
+
+async function request(path: string, init: RequestInit): Promise<Response> {
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const message = body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string' ? (body as { error: string }).error : `Challenge API returned ${response.status}`;
+    throw new Error(message);
+  }
+  return response;
+}
+function parseChallenge(body: unknown): Challenge {
+  if (!body || typeof body !== 'object' || !('challenge' in body)) throw new Error('Invalid challenge response');
+  return (body as { challenge: Challenge }).challenge;
+}
+export async function listChallenges(userId: string): Promise<Challenge[]> {
+  const body: unknown = await (await request('/challenges', { method: 'GET', headers: { 'x-user-id': userId } })).json();
+  if (!body || typeof body !== 'object' || !Array.isArray((body as { challenges?: unknown }).challenges)) throw new Error('Invalid challenge list response');
+  return (body as { challenges: Challenge[] }).challenges;
+}
+export async function createChallenge(user: { userId: string; displayName: string }, receiver: NearbyUser): Promise<Challenge> {
+  return parseChallenge(await (await request('/challenges', { method: 'POST', headers: { 'x-user-id': user.userId, 'x-display-name': user.displayName }, body: JSON.stringify({ receiverId: receiver.userId }) })).json());
+}
+export async function acceptChallenge(userId: string, challengeId: string): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/accept`, { method: 'POST', headers: { 'x-user-id': userId } })).json());
+}
+export async function declineChallenge(userId: string, challengeId: string): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/decline`, { method: 'POST', headers: { 'x-user-id': userId } })).json());
+}

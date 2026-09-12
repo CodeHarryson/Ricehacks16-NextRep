@@ -11,5 +11,5 @@ then nearby users are polled every 15 seconds. Leaving the screen or selecting
 The server owns the 250-metre radius, expiry, and distance calculation. It returns
 coordinates quantized to four decimal places; exact coordinates of other users are
 never sent to the app. Presence rows expire after 60 seconds and cleanup removes
-expired rows. No background tracking, camera uploads, battle scoring, or matching
-is implemented.
+expired rows. The proximity challenge handshake is implemented, but there is no
+background tracking, workout battle scoring, or shared workout configuration.

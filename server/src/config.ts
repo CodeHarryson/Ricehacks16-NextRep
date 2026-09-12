@@ -6,6 +6,7 @@ export const NEARBY_RADIUS_METERS = 250;
 export const PRESENCE_EXPIRY_SECONDS = 60;
 export const MAX_CAPTURE_AGE_SECONDS = 120;
 export const MAX_FUTURE_SKEW_SECONDS = 30;
+export const CHALLENGE_EXPIRY_SECONDS = 120;
 
 export function databaseUrl(): string {
   const value = process.env.TIGER_DATABASE_URL;

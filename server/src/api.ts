@@ -1,11 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN } from './config.js';
+import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN } from './config.js';
 import { pool, type DbClient } from './db.js';
 import { quantizeCoordinate, validatePresence, type PresenceInput } from './validation.js';
 
 type PresenceRow = { user_id: string; display_name: string; latitude: number; longitude: number; captured_at: Date | string; distance_meters: number };
+type ChallengeRow = { challenge_id: string; sender_id: string; receiver_id: string; sender_display_name: string; receiver_display_name: string; status: string; created_at: Date | string; expires_at: Date | string; accepted_at: Date | string | null; proximity_meters: number };
+const challengeResponse = (row: ChallengeRow) => ({
+  challengeId: row.challenge_id,
+  senderId: row.sender_id,
+  receiverId: row.receiver_id,
+  senderDisplayName: row.sender_display_name,
+  receiverDisplayName: row.receiver_display_name,
+  status: row.status,
+  createdAt: new Date(row.created_at).toISOString(),
+  expiresAt: new Date(row.expires_at).toISOString(),
+  acceptedAt: row.accepted_at ? new Date(row.accepted_at).toISOString() : null,
+  proximityMeters: Math.round(Number(row.proximity_meters)),
+});
 export function createApp(db: DbClient = pool): Hono {
   const app = new Hono();
   app.use('*', cors({ origin: CORS_ORIGIN }));
@@ -65,6 +78,74 @@ export function createApp(db: DbClient = pool): Hono {
     if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
     await db.query('UPDATE presence_events SET expires_at = NOW() WHERE user_id = $1 AND expires_at > NOW()', [userId]);
     return context.json({ ok: true });
+  });
+  app.post('/challenges', async (context) => {
+    const senderId = context.req.header('x-user-id');
+    const senderDisplayName = context.req.header('x-display-name')?.trim();
+    let body: unknown;
+    try { body = await context.req.json(); } catch { return context.json({ error: 'invalid JSON' }, 400); }
+    const receiverId = body && typeof body === 'object' && typeof (body as Record<string, unknown>).receiverId === 'string' ? (body as Record<string, string>).receiverId : '';
+    if (!senderId || !senderDisplayName || !receiverId || senderId === receiverId) return context.json({ error: 'sender, display name, and a different receiver are required' }, 400);
+    const proximity = await db.query<{ receiver_display_name: string; proximity_meters: number }>(
+      `WITH latest AS (
+        SELECT DISTINCT ON (user_id) user_id, display_name, location
+        FROM presence_events WHERE expires_at > NOW() AND user_id IN ($1, $2)
+        ORDER BY user_id, captured_at DESC
+      ) SELECT b.display_name AS receiver_display_name, ST_Distance(a.location, b.location) AS proximity_meters
+        FROM latest a JOIN latest b ON a.user_id = $1 AND b.user_id = $2`, [senderId, receiverId]);
+    const proximityRow = proximity.rows[0];
+    if (!proximityRow) return context.json({ error: 'both users must have active presence' }, 409);
+    const distance = Number(proximityRow.proximity_meters);
+    if (distance > NEARBY_RADIUS_METERS) return context.json({ error: 'user is outside the challenge radius' }, 409);
+    const duplicate = await db.query<{ challenge_id: string }>(
+      `SELECT challenge_id FROM challenges WHERE status = 'pending' AND expires_at > NOW()
+       AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) LIMIT 1`, [senderId, receiverId]);
+    if (duplicate.rows.length > 0) return context.json({ error: 'a pending challenge already exists' }, 409);
+    const createdAt = new Date();
+    const result = await db.query<ChallengeRow>(
+      `INSERT INTO challenges (challenge_id, sender_id, receiver_id, sender_display_name, receiver_display_name, status, created_at, expires_at, proximity_meters)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6::timestamptz, $6::timestamptz + INTERVAL '${CHALLENGE_EXPIRY_SECONDS} seconds', $7)
+       RETURNING *`, [randomUUID(), senderId, receiverId, senderDisplayName, proximityRow.receiver_display_name, createdAt.toISOString(), distance]);
+    const created = result.rows[0];
+    if (!created) return context.json({ error: 'challenge creation failed' }, 500);
+    return context.json({ challenge: challengeResponse(created) }, 201);
+  });
+  app.get('/challenges', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    await db.query(`UPDATE challenges SET status = 'expired' WHERE status = 'pending' AND expires_at <= NOW() AND (sender_id = $1 OR receiver_id = $1)`, [userId]);
+    const result = await db.query<ChallengeRow>(
+      `SELECT * FROM challenges WHERE (sender_id = $1 OR receiver_id = $1) ORDER BY created_at DESC`, [userId]);
+    return context.json({ challenges: result.rows.map(challengeResponse) });
+  });
+  app.post('/challenges/:id/accept', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    const result = await db.query<ChallengeRow>(
+      `UPDATE challenges SET status = 'accepted', accepted_at = NOW()
+       WHERE challenge_id = $1 AND receiver_id = $2 AND status = 'pending' AND expires_at > NOW() RETURNING *`, [context.req.param('id'), userId]);
+    if (result.rows.length === 0) {
+      const existing = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND receiver_id = $2', [context.req.param('id'), userId]);
+      if (existing.rows[0]?.status === 'accepted') return context.json({ challenge: challengeResponse(existing.rows[0]) });
+      return context.json({ error: 'challenge is unavailable' }, 409);
+    }
+    const accepted = result.rows[0];
+    if (!accepted) return context.json({ error: 'challenge update failed' }, 500);
+    return context.json({ challenge: challengeResponse(accepted) });
+  });
+  app.post('/challenges/:id/decline', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    const result = await db.query<ChallengeRow>(
+      `UPDATE challenges SET status = 'declined' WHERE challenge_id = $1 AND receiver_id = $2 AND status = 'pending' AND expires_at > NOW() RETURNING *`, [context.req.param('id'), userId]);
+    if (result.rows.length === 0) {
+      const existing = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND receiver_id = $2', [context.req.param('id'), userId]);
+      if (existing.rows[0]?.status === 'declined') return context.json({ challenge: challengeResponse(existing.rows[0]) });
+      return context.json({ error: 'challenge is unavailable' }, 409);
+    }
+    const declined = result.rows[0];
+    if (!declined) return context.json({ error: 'challenge update failed' }, 500);
+    return context.json({ challenge: challengeResponse(declined) });
   });
   return app;
 }
