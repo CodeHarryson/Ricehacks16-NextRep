@@ -32,7 +32,7 @@ export default function App() {
         <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
         <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} />}
+        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={() => setScreen('workout')} />}
       </>}
     </ScrollView>
   </SafeAreaView></SafeAreaProvider>;

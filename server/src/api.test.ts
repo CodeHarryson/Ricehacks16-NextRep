@@ -85,6 +85,27 @@ test('challenge creation, listing, receiver-only responses, expiry, and retries 
   assert.equal(expired.status, 409);
 });
 
+test('challenge listing and detail hide every expired lifecycle state', async () => {
+  const future = new Date(Date.now() + 60_000);
+  const db = { query: async <T>(sql: string) => {
+    if (sql.startsWith('UPDATE challenges')) return { rows: [], rowCount: 0 };
+    if (sql.startsWith('SELECT * FROM challenges WHERE (sender_id')) {
+      assert.match(sql, /expires_at > NOW\(\)/);
+      return { rows: [challengeRow({ status: 'pending', expires_at: future })] as T[], rowCount: 1 };
+    }
+    if (sql.startsWith('SELECT * FROM challenges WHERE challenge_id')) {
+      assert.match(sql, /expires_at > NOW\(\)/);
+      return { rows: [] as T[], rowCount: 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  } };
+  const app = createApp(db);
+  const listed = await app.request('http://local/challenges', { headers: { 'x-user-id': 'sender' } });
+  assert.deepEqual((await listed.json()).challenges.map((challenge: { challengeId: string }) => challenge.challengeId), ['c1']);
+  const detail = await app.request('http://local/challenges/expired', { headers: { 'x-user-id': 'sender' } });
+  assert.equal(detail.status, 404);
+});
+
 test('shared configuration validates, resets acceptance, reaches ready, and starts idempotently', async () => {
   const row = challengeRow({ status: 'accepted', exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, rest_seconds: 30, match_time_limit_seconds: 300, config_version: 1, sender_accepted_at: null, receiver_accepted_at: null, started_at: null });
   let current = { ...row };

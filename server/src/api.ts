@@ -132,16 +132,16 @@ export function createApp(db: DbClient = pool): Hono {
   app.get('/challenges', async (context) => {
     const userId = context.req.header('x-user-id');
     if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
-    await db.query(`UPDATE challenges SET status = 'expired' WHERE status = 'pending' AND expires_at <= NOW() AND (sender_id = $1 OR receiver_id = $1)`, [userId]);
+    await db.query(`UPDATE challenges SET status = 'expired' WHERE status IN ('pending', 'accepted', 'configuring', 'ready', 'active') AND expires_at <= NOW() AND (sender_id = $1 OR receiver_id = $1)`, [userId]);
     const result = await db.query<ChallengeRow>(
-      `SELECT * FROM challenges WHERE (sender_id = $1 OR receiver_id = $1) ORDER BY created_at DESC`, [userId]);
+      `SELECT * FROM challenges WHERE (sender_id = $1 OR receiver_id = $1) AND expires_at > NOW() ORDER BY created_at DESC`, [userId]);
     return context.json({ challenges: result.rows.map(challengeResponse) });
   });
   app.get('/challenges/:id', async (context) => {
     const userId = context.req.header('x-user-id');
     if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
-    await db.query(`UPDATE challenges SET status = 'expired' WHERE challenge_id = $1 AND status IN ('pending', 'accepted', 'configuring') AND expires_at <= NOW()`, [context.req.param('id')]);
-    const result = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), userId]);
+    await db.query(`UPDATE challenges SET status = 'expired' WHERE challenge_id = $1 AND status IN ('pending', 'accepted', 'configuring', 'ready', 'active') AND expires_at <= NOW()`, [context.req.param('id')]);
+    const result = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2) AND expires_at > NOW()', [context.req.param('id'), userId]);
     const challenge = result.rows[0];
     if (!challenge) return context.json({ error: 'challenge not found' }, 404);
     return context.json({ challenge: challengeResponse(challenge) });
