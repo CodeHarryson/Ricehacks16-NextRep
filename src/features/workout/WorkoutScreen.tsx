@@ -8,7 +8,7 @@ import { CameraPreview } from '../tracking/CameraPreview';
 import { assessFaceStart, FACE_START_HOLD_FRAMES } from '../tracking/faceStartGate';
 import { selectVisibleSide } from '../tracking/poseAdapter';
 import { DEFAULT_RUBRIC, SquatAnalyzer, type AnalyzerOutput, type SquatPhase } from '../squat/engine';
-import { grantCompletedWorkout, saveWorkoutPerformance } from '../progression/storage';
+import { grantBattleReward, grantCompletedWorkout, saveWorkoutPerformance } from '../progression/storage';
 import { loadDemoUser } from '../location/identity';
 import { getChallengeResults, submitChallengeResult, type ChallengeResolution, type ChallengeResult } from '../challenge/api';
 import { acceptAttempt, createWorkoutState, setRewardStatus, type SetCompleted, type WorkoutState } from './controller';
@@ -17,6 +17,7 @@ import { advanceSessionClock, canAcceptSessionAttempt, createSessionClock, type 
 import { scoreAttempts, SCORE_POLICY_VERSION, type WorkoutScore } from './scoring';
 import { completedSetCountAfterCompletion } from './sessionAccounting';
 import { resultStatusAfter, type ResultStatus } from './finalization';
+import { BATTLE_REWARD_POLICY_VERSION, BATTLE_REWARDS, type BattleOutcome } from '../challenge/rewards';
 
 function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): string {
   if (rejectedReason?.includes('visibility') || rejectedReason?.includes('framing') || rejectedReason?.includes('missing')) {
@@ -80,6 +81,10 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   const [resolution, setResolution] = useState<ChallengeResolution>({ status: 'pending' });
   const [resultStatus, setResultStatus] = useState<ResultStatus>('not_started');
   const finalizationInFlight = useRef(false);
+  const battleRewardInFlight = useRef(false);
+  const battleRewardGranted = useRef(false);
+  const [battleRewardStatus, setBattleRewardStatus] = useState<'pending' | 'saved' | 'failed'>('pending');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   useEffect(() => {
     if (!validSession) return;
     const timer = setInterval(() => { const next = advanceSessionClock(clock.current, Date.now()); clock.current = next; setClockState(next); }, 250);
@@ -98,9 +103,10 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   useEffect(() => {
     if (sessionConfig.mode !== 'challenge' || !sessionConfig.challengeId || !challengeResult) return;
     let cancelled = false;
-    const poll = async () => { try { const user = await loadDemoUser(); const response = await getChallengeResults(user.userId, sessionConfig.challengeId!); if (!cancelled) { setOpponentResult(response.results.find((item) => item.participantId !== user.userId) ?? null); setResolution(response.resolution); } } catch { /* retry on the next poll */ } };
+    const poll = async () => { try { const user = await loadDemoUser(); const response = await getChallengeResults(user.userId, sessionConfig.challengeId!); if (!cancelled) { setCurrentUserId(user.userId); setOpponentResult(response.results.find((item) => item.participantId !== user.userId) ?? null); setResolution(response.resolution); if (response.resolution.status === 'resolved' && !battleRewardGranted.current && !battleRewardInFlight.current) { battleRewardInFlight.current = true; const outcome: BattleOutcome = response.resolution.winnerId === null ? 'draw' : response.resolution.winnerId === user.userId ? 'winner' : 'loser'; void grantBattleReward({ challengeId: sessionConfig.challengeId!, participantId: user.userId, outcome, ...BATTLE_REWARDS[outcome], rewardPolicyVersion: BATTLE_REWARD_POLICY_VERSION }).then(() => { battleRewardGranted.current = true; setBattleRewardStatus('saved'); }).catch(() => setBattleRewardStatus('failed')).finally(() => { battleRewardInFlight.current = false; }); } } } catch { /* retry on the next poll */ } };
     void poll(); const timer = setInterval(() => { void poll(); }, 5000); return () => { cancelled = true; clearInterval(timer); };
   }, [challengeResult, sessionConfig.challengeId, sessionConfig.mode]);
+  const retryBattleReward = () => { if (!currentUserId || !sessionConfig.challengeId || resolution.status !== 'resolved' || battleRewardInFlight.current) return; const outcome: BattleOutcome = resolution.winnerId === null ? 'draw' : resolution.winnerId === currentUserId ? 'winner' : 'loser'; battleRewardInFlight.current = true; setBattleRewardStatus('pending'); void grantBattleReward({ challengeId: sessionConfig.challengeId, participantId: currentUserId, outcome, ...BATTLE_REWARDS[outcome], rewardPolicyVersion: BATTLE_REWARD_POLICY_VERSION }).then(() => { battleRewardGranted.current = true; setBattleRewardStatus('saved'); }).catch(() => setBattleRewardStatus('failed')).finally(() => { battleRewardInFlight.current = false; }); };
   const persistCompletion = useCallback(async (completion: SetCompleted, attemptKeys: readonly string[]) => {
     if (rewardInFlight.current) return;
     rewardInFlight.current = true;
@@ -244,7 +250,7 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
       {resultStatus === 'submission_pending' && <Text style={styles.heading}>Submitting challenge result…</Text>}
       {resultStatus === 'submitted' && <Text style={styles.heading}>Challenge result submitted.</Text>}
       {challengeResult && <Card><Text style={styles.heading}>{sessionConfig.mode === 'challenge' ? 'Challenge score' : 'Solo score'}</Text><Text style={styles.body}>{challengeResult.totalScore} points · {challengeResult.countedReps}/{challengeResult.cappedTargetReps} counted reps · {challengeResult.greenReps} green · {challengeResult.yellowReps} yellow</Text><Text style={styles.body}>Policy: {SCORE_POLICY_VERSION}{sessionConfig.mode === 'challenge' ? ' · Server resolution pending.' : ''}</Text></Card>}
-      {sessionConfig.mode === 'challenge' && resultStatus === 'submitted' && <Card><Text style={styles.heading}>{opponentResult ? `Opponent score: ${opponentResult.totalScore}` : 'Waiting for opponent result…'}</Text>{resolution.status === 'resolved' && <Text style={styles.body}>{resolution.winnerId === null ? 'Draw.' : 'Winner resolved by server.'}</Text>}</Card>}
+      {sessionConfig.mode === 'challenge' && resultStatus === 'submitted' && <Card><Text style={styles.heading}>{resolution.status !== 'resolved' ? 'Waiting for opponent result…' : resolution.winnerId === null ? 'Draw' : resolution.winnerId === currentUserId ? 'Victory' : 'Defeat'}</Text><Text style={styles.body}>Your score: {challengeResult?.totalScore ?? 0}{opponentResult ? ` · Opponent: ${opponentResult.totalScore}` : ''}{resolution.status === 'resolved' ? ` · Winning score: ${resolution.winningScore ?? 0}` : ''}</Text>{resolution.status === 'resolved' && <><Text style={styles.body}>Reward: {battleRewardStatus === 'saved' ? 'Reward saved' : battleRewardStatus === 'failed' ? 'Reward save failed' : 'Reward pending'}</Text>{battleRewardStatus === 'failed' && <Action title="Retry battle reward" onPress={retryBattleReward} />}</>}</Card>}
       {resultError && <Card><Text style={styles.body}>Result save failed: {resultError}</Text><Action title="Retry result save" onPress={() => { void finalizeSessionResult(workoutState.status === 'complete', completion.current); }} /></Card>}
       <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
       <Text style={styles.body}>{workoutState.lastAttempt ? `Latest attempt: ${workoutState.lastAttempt.rating ?? 'neutral'} — ${workoutState.lastAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { WORKOUT_COMPLETION_REWARD } from '../../config/workout';
-import { grantCompletedWorkout, loadPlayer, setPlayerStorageForTesting } from './storage';
+import { grantBattleReward, grantCompletedWorkout, loadPlayer, setPlayerStorageForTesting } from './storage';
+import { BATTLE_REWARD_POLICY_VERSION, BATTLE_REWARDS } from '../challenge/rewards';
 
 class MemoryStorage {
   readonly values = new Map<string, string>();
@@ -81,4 +82,14 @@ test('invalid saved data is not overwritten', async () => {
   setPlayerStorageForTesting(memory);
   await assert.rejects(loadPlayer(), /invalid/);
   assert.equal(memory.values.get(key), '{invalid');
+});
+
+test('battle rewards are idempotent, concurrent-safe, and do not change OVR', async () => {
+  const memory = new MemoryStorage(); setPlayerStorageForTesting(memory);
+  const winner = { challengeId: 'c', participantId: 'p1', outcome: 'winner' as const, ...BATTLE_REWARDS.winner, rewardPolicyVersion: BATTLE_REWARD_POLICY_VERSION };
+  const [first, duplicate] = await Promise.all([grantBattleReward(winner), grantBattleReward(winner)]);
+  assert.deepEqual([first.granted, duplicate.granted].sort(), [false, true]); assert.equal((await loadPlayer()).xp, BATTLE_REWARDS.winner.xp); assert.equal((await loadPlayer()).coins, BATTLE_REWARDS.winner.coins); assert.equal((await loadPlayer()).overallRating, 60);
+  const loser = await grantBattleReward({ challengeId: 'c2', participantId: 'p2', outcome: 'loser', ...BATTLE_REWARDS.loser, rewardPolicyVersion: BATTLE_REWARD_POLICY_VERSION });
+  const draw = await grantBattleReward({ challengeId: 'c3', participantId: 'p3', outcome: 'draw', ...BATTLE_REWARDS.draw, rewardPolicyVersion: BATTLE_REWARD_POLICY_VERSION });
+  assert.equal(loser.granted, true); assert.equal(draw.granted, true); assert.equal((await loadPlayer()).overallRating, 60);
 });

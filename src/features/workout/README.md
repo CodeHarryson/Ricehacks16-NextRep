@@ -12,9 +12,11 @@ Challenge-aware camera navigation, synchronized countdown/deadline sessions,
 multi-set accounting, rest periods, `score-v1` scoring, and result finalization
 for both completed and timed-out sessions are implemented. Solo performance
 records are persisted locally; challenge results are server-validated and
-idempotently submitted. Battle rewards, advanced leaderboards, and richer
-performance synchronization remain planned. Demo header identity is not
-production authentication.
+idempotently submitted. Battle outcomes now resolve server-side and grant the
+versioned `battle-reward-v1` local policy exactly once: winner +50 XP/+100 coins,
+loser +25 XP/+25 coins, draw +25 XP/+50 coins. Battle rewards never change
+permanent OVR. Advanced leaderboards, shops, richer synchronization, and
+production authentication remain planned.
 
 Progression serializes AsyncStorage read-modify-write operations. A completed set
 uses deterministic completion/reward IDs and saves XP, OVR, coins, completed-workout

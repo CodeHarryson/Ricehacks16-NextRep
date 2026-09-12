@@ -112,6 +112,17 @@ export interface CompletedWorkoutReward {
   coins: number;
   overallRatingDelta: number;
 }
+export interface BattleReward { challengeId: string; participantId: string; outcome: 'winner' | 'loser' | 'draw'; xp: number; coins: number; rewardPolicyVersion: string; }
+export async function grantBattleReward(reward: BattleReward): Promise<{ player: PlayerState; granted: boolean; rewardId: string }> {
+  if (!reward.challengeId || !reward.participantId || !isNonNegativeInteger(reward.xp) || !isNonNegativeInteger(reward.coins) || !reward.rewardPolicyVersion) throw new Error('Battle reward is invalid.');
+  const rewardId = `battle:${reward.challengeId}:${reward.participantId}:${reward.rewardPolicyVersion}`;
+  return serialized(async () => {
+    const player = await loadPlayerUnsafe();
+    if (player.processedRewardIds.includes(rewardId)) return { player, granted: false, rewardId };
+    const next: PlayerState = { ...player, xp: Math.min(Number.MAX_SAFE_INTEGER, player.xp + reward.xp), coins: Math.min(Number.MAX_SAFE_INTEGER, player.coins + reward.coins), processedRewardIds: [...player.processedRewardIds, rewardId] };
+    await storage.setItem(KEY, JSON.stringify(next)); return { player: next, granted: true, rewardId };
+  });
+}
 
 export interface WorkoutPerformance {
   performanceId: string; workoutId: string; userId?: string; mode: 'solo' | 'challenge'; exercise: string; setCount: number; targetReps: number; matchDurationSeconds: number; startedAt: string; endedAt: string; countedReps: number; greenReps: number; yellowReps: number; redAttempts: number; neutralAttempts: number; totalScore: number; scorePolicyVersion: string;

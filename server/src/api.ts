@@ -249,7 +249,7 @@ export function createApp(db: DbClient = pool): Hono {
     const inserted = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2', [challenge.challenge_id, participantId]);
     const result = inserted.rows[0]; if (!result) return context.json({ error: 'result submission failed' }, 500);
     const allResults = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1', [challenge.challenge_id]);
-    if (allResults.rows.length >= 2 || new Date(challenge.expires_at).getTime() <= Date.now()) {
+    if (allResults.rows.length >= 2 || deadline.getTime() <= Date.now()) {
       const scores = allResults.rows.map((item) => ({ id: item.participant_id, score: item.total_score })); const winningScore = scores.length ? Math.max(...scores.map((item) => item.score)) : 0; const winners = scores.filter((item) => item.score === winningScore); const winnerId = winners.length === 1 ? winners[0]?.id ?? null : null;
       await db.query(`UPDATE challenges SET resolution_status = 'resolved', resolved_at = COALESCE(resolved_at, NOW()), winner_id = $2, winning_score = $3 WHERE challenge_id = $1 AND resolution_status <> 'resolved'`, [challenge.challenge_id, winnerId, winningScore]);
     }
