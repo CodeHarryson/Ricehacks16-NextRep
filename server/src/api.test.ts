@@ -265,3 +265,18 @@ test('GET results cancels a pending one-sided challenge after its deadline', asy
   const second = await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'sender' } });
   assert.equal((await second.json()).resolution.status, 'cancelled');
 });
+
+test('a re-entered workout cannot duplicate or overwrite a submitted result', async () => {
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: new Date(Date.now() - 20_000) });
+  const { db, results, queries } = resolutionDb(challenge); const app = createApp(db);
+  const start = new Date(Date.now() - 5_000); const end = new Date(Date.now() - 1_000);
+  const post = (green: number, key: string) => app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': key }, body: JSON.stringify(resultRequest(start, end, green, key)) });
+  const first = await post(4, 'first-key');
+  assert.equal(first.status, 201);
+  const firstBody = await first.json();
+  const reentered = await post(0, 'second-key');
+  assert.equal(reentered.status, 200);
+  assert.deepEqual(await reentered.json(), firstBody);
+  assert.equal(results.length, 1);
+  assert.equal(queries.filter((sql) => sql.includes('INSERT INTO challenge_participant_results')).length, 1);
+});

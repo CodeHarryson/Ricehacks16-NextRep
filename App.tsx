@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BackHandler, ScrollView, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Action, Card, styles } from './src/components/ui';
@@ -14,13 +14,20 @@ export default function App() {
   const [challengeOpponent, setChallengeOpponent] = useState<NearbyUser | null>(null);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [workoutSession, setWorkoutSession] = useState<WorkoutSessionConfig | undefined>();
+  const [launchedChallengeIds, setLaunchedChallengeIds] = useState<ReadonlySet<string>>(() => new Set());
+  const exitTarget = workoutSession?.mode === 'challenge' ? 'map' : 'home';
+  const startChallengeWorkout = useCallback((session: WorkoutSessionConfig) => {
+    const { challengeId } = session;
+    if (challengeId) setLaunchedChallengeIds((current) => current.has(challengeId) ? current : new Set(current).add(challengeId));
+    setWorkoutSession(session); setScreen('workout');
+  }, []);
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (screen === 'home') return false;
-      setScreen(screen === 'challenge' ? 'map' : 'home'); return true;
+      setScreen(screen === 'challenge' || (screen === 'workout' && exitTarget === 'map') ? 'map' : 'home'); return true;
     });
     return () => listener.remove();
-  }, [screen]);
+  }, [exitTarget, screen]);
   return <SafeAreaProvider><SafeAreaView style={styles.screen}>
     <StatusBar barStyle="light-content" />
     <ScrollView contentContainerStyle={styles.content}>
@@ -34,12 +41,12 @@ export default function App() {
         <Action title="View progression" onPress={() => setScreen('progression')} />
         <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
-        <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen session={workoutSession} /> : screen === 'progression' ? <ProgressionScreen /> : <>
+        {screen === 'workout' && exitTarget === 'map' ? <Action title="Back to map" onPress={() => setScreen('map')} /> : <Action title="Back to home" onPress={() => setScreen('home')} />}
+        {screen === 'workout' ? <WorkoutScreen session={workoutSession} onExit={() => setScreen(exitTarget)} /> : screen === 'progression' ? <ProgressionScreen /> : <>
           {/* Keep the map mounted (hidden) on the challenge screen: unmounting it stops presence,
               and the server rejects challenges unless both players have active presence. */}
           <View style={{ display: screen === 'map' ? 'flex' : 'none' }}><MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} onNearbyChange={setNearbyUsers} /></View>
-          {screen === 'challenge' && <ChallengeScreen opponent={challengeOpponent} nearbyUsers={nearbyUsers}onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
+          {screen === 'challenge' && <ChallengeScreen opponent={challengeOpponent} nearbyUsers={nearbyUsers} launchedChallengeIds={launchedChallengeIds} onBack={() => setScreen('map')} onStartWorkout={startChallengeWorkout} />}
         </>}
       </>}
     </ScrollView>
