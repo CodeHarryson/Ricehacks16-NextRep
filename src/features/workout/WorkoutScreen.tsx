@@ -1,13 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Card, styles } from '../../components/ui';
-import { WORKOUT_TARGET_REPS } from '../../config/workout';
+import { Action, Card, styles } from '../../components/ui';
+import { WORKOUT_COMPLETION_REWARD } from '../../config/workout';
 import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { CameraPreview } from '../tracking/CameraPreview';
 import { assessFaceStart, FACE_START_HOLD_FRAMES } from '../tracking/faceStartGate';
 import { selectVisibleSide } from '../tracking/poseAdapter';
 import { DEFAULT_RUBRIC, SquatAnalyzer, type AnalyzerOutput, type SquatPhase } from '../squat/engine';
+import { grantCompletedWorkout } from '../progression/storage';
+import { acceptAttempt, createWorkoutState, setRewardStatus, type SetCompleted, type WorkoutState } from './controller';
 
 function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): string {
   if (rejectedReason?.includes('visibility') || rejectedReason?.includes('framing') || rejectedReason?.includes('missing')) {
@@ -27,6 +29,11 @@ function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): st
 }
 
 export function WorkoutScreen() {
+  const workoutIds = useRef<{ sessionId: string; setId: string } | null>(null);
+  if (workoutIds.current === null) {
+    const sessionId = `squat-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    workoutIds.current = { sessionId, setId: `squat-set-${sessionId}` };
+  }
   const analyzer = useRef<SquatAnalyzer | null>(null);
   const selectedSide = useRef<'left' | 'right' | null>(null);
   const faceLockedRef = useRef(false);
@@ -35,13 +42,46 @@ export function WorkoutScreen() {
   const [faceProgress, setFaceProgress] = useState(0);
   const [tracking, setTracking] = useState<TrackingUpdate>({ status: 'initializing', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: 'Starting on-device pose tracking…' });
   const [phase, setPhase] = useState<SquatPhase>('CALIBRATING');
-  const [reps, setReps] = useState(0);
-  const [latestAttempt, setLatestAttempt] = useState<AttemptResult | null>(null);
+  const workout = useRef<WorkoutState>(createWorkoutState(workoutIds.current.sessionId, workoutIds.current.setId));
+  const [workoutState, setWorkoutState] = useState<WorkoutState>(workout.current);
+  const rewardInFlight = useRef(false);
+  const completion = useRef<SetCompleted | null>(null);
   const [analysisGuidance, setAnalysisGuidance] = useState('Center your face in the oval to start.');
   const [analysisNeutral, setAnalysisNeutral] = useState(true);
   const [measurement, setMeasurement] = useState<AnalyzerOutput['feature']>(null);
   const [trackingDetail, setTrackingDetail] = useState('Waiting for accepted landmarks.');
   const interrupted = useRef(false);
+  const persistCompletion = useCallback(async (completion: SetCompleted, attemptKeys: readonly string[]) => {
+    if (rewardInFlight.current) return;
+    rewardInFlight.current = true;
+    try {
+      await grantCompletedWorkout({
+        workoutId: completion.completionId,
+        rewardId: completion.rewardId,
+        attemptKeys,
+        ...WORKOUT_COMPLETION_REWARD,
+      });
+      workout.current = setRewardStatus(workout.current, 'granted');
+      setWorkoutState(workout.current);
+    } catch {
+      workout.current = setRewardStatus(workout.current, 'failed');
+      setWorkoutState(workout.current);
+    } finally {
+      rewardInFlight.current = false;
+    }
+  }, []);
+  const consumeAttempts = useCallback((attempts: readonly AttemptResult[]) => {
+    for (const attempt of attempts) {
+      const accepted = acceptAttempt(workout.current, attempt);
+      if (accepted.state === workout.current) continue;
+      workout.current = accepted.state;
+      setWorkoutState(accepted.state);
+      if (accepted.completion) {
+        completion.current = accepted.completion;
+        void persistCompletion(accepted.completion, accepted.state.processedAttemptKeys);
+      }
+    }
+  }, [persistCompletion]);
   const onFrame = useCallback((frame: PoseFrame) => {
     if (!faceLockedRef.current) {
       const face = assessFaceStart(frame);
@@ -65,7 +105,7 @@ export function WorkoutScreen() {
         setAnalysisNeutral(true);
         return;
       }
-      analyzer.current = new SquatAnalyzer({ sessionId: 'demo-session', setId: 'demo-set', selectedSide: selectedSide.current });
+      analyzer.current = new SquatAnalyzer({ sessionId: workout.current.sessionId, setId: workout.current.setId, selectedSide: selectedSide.current });
     }
     const activeAnalyzer = analyzer.current;
     if (activeAnalyzer === null) return;
@@ -75,10 +115,15 @@ export function WorkoutScreen() {
     setTrackingDetail(output.rejectedReason ?? 'Landmarks accepted.');
     setAnalysisGuidance(guidanceForOutput(output.phase, output.rejectedReason));
     setAnalysisNeutral(output.tracking !== 'tracking' || output.rejectedReason !== null);
-    const attempt = output.attempts[output.attempts.length - 1];
-    if (attempt) { setLatestAttempt(attempt); setReps((current) => Math.min(WORKOUT_TARGET_REPS, current + attempt.countDelta)); }
+    consumeAttempts(output.attempts);
     interrupted.current = false;
-  }, []);
+  }, [consumeAttempts]);
+  const retryReward = useCallback(() => {
+    if (completion.current === null) return;
+    workout.current = setRewardStatus(workout.current, 'pending');
+    setWorkoutState(workout.current);
+    void persistCompletion(completion.current, workout.current.processedAttemptKeys);
+  }, [persistCompletion]);
   const onTracking = useCallback((update: TrackingUpdate) => {
     setTracking(update);
     if (!faceLockedRef.current && update.status !== 'tracking') {
@@ -86,12 +131,13 @@ export function WorkoutScreen() {
       setFaceProgress(0);
     }
     if ((update.status === 'lost' || update.status === 'error') && !interrupted.current) {
-      const attempt = analyzer.current?.updateTracking(null, update.monotonicTimestamp).at(-1); if (attempt) setLatestAttempt(attempt);
+      const attempts = analyzer.current?.updateTracking(null, update.monotonicTimestamp) ?? [];
+      consumeAttempts(attempts);
       if (analyzer.current) setPhase(analyzer.current.snapshot.phase);
       setAnalysisNeutral(true); interrupted.current = true;
     }
     if (update.status === 'tracking') interrupted.current = false;
-  }, []);
+  }, [consumeAttempts]);
   const neutral = tracking.status === 'lost' || tracking.status === 'error' || analysisNeutral;
   return <View style={{ gap: 20 }}>
     <Text style={styles.eyebrow}>SETUP / BODYWEIGHT SQUATS</Text>
@@ -105,8 +151,11 @@ export function WorkoutScreen() {
       <Text style={styles.body}>Phase: {phase}</Text>
       <Text style={styles.body}>Movement range: {measurement ? `${measurement.rangeFromStandingDeg.toFixed(1)}°` : '—'} (minimum {DEFAULT_RUBRIC.minimumRangeDeg}°)</Text>
       <Text style={styles.body}>Tracking detail: {trackingDetail}</Text>
-      <Text style={styles.heading}>Reps: {reps}/{WORKOUT_TARGET_REPS}</Text>
-      <Text style={styles.body}>{latestAttempt ? `Latest attempt: ${latestAttempt.rating ?? 'neutral'} — ${latestAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
+      <Text style={styles.heading}>Reps: {workoutState.reps}/{workoutState.targetReps}</Text>
+      <Text style={styles.body}>Set: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
+      <Text style={styles.body}>{workoutState.lastAttempt ? `Latest attempt: ${workoutState.lastAttempt.rating ?? 'neutral'} — ${workoutState.lastAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
+      {workoutState.status === 'complete' && <Text style={styles.heading} accessibilityLiveRegion="polite">Set complete{workoutState.rewardStatus === 'granted' ? ' — 25 XP and +1 OVR saved locally.' : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…'}</Text>}
+      {workoutState.rewardStatus === 'failed' && <Action title="Retry reward save" onPress={retryReward} />}
     </Card>
   </View>;
 }

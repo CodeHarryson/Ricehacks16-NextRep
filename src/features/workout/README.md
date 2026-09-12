@@ -4,15 +4,16 @@ UI/audio owner: WorkoutScreen and components. Later render completed AttemptResu
 events with both text and color; optional audio cues must follow those same events.
 Do not request microphone access to play audio. Audio is not implemented yet.
 
-Controller/storage owner: controller.ts and progression. Own session/set IDs, five-rep
-sets, rest, totals, XP policy, upgrades and persistence. acceptAttempt establishes
-in-memory deduplication; it is not connected to a detector or reward system.
+Controller/storage owner: controller.ts and progression. The controller owns stable
+session/set IDs, five-rep capped totals, attempt-key and attempt-ID deduplication,
+and the one-time completion event. WorkoutScreen sends every completed analyzer
+attempt to it; continuous frames and tracking updates never receive rewards.
 
-Before adding rewards: hydrate the persisted processedAttemptKeys, serialize event
-processing, validate runtime events, and save XP plus the dedup key in one player
-record before showing success. On failed persistence, keep the event pending and
-retry the same ID; never award again. AsyncStorage is not a multi-writer transaction
-store: use one controller writer. Do not prune keys while events can be replayed.
+Progression serializes AsyncStorage read-modify-write operations. A completed set
+uses deterministic completion/reward IDs and saves XP, OVR, coins, completed-workout
+and processed-reward IDs in one record before the UI reports success. A failed save
+stays retryable with the same IDs; duplicate delivery or reload cannot grant twice.
+Do not prune IDs while events can be replayed.
 
 Squat owner: implement the pure engine in ../squat. Green means preferred completion
 (+1); yellow means minimum completion (+1); red is an assessable partial attempt

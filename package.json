@@ -10,7 +10,7 @@
     "prebuild": "expo prebuild --no-install",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "tsx --test src/features/squat/*.test.ts src/features/tracking/*.test.ts",
+    "test": "tsx --test src/features/squat/*.test.ts src/features/tracking/*.test.ts src/features/workout/*.test.ts src/features/progression/*.test.ts",
     "replay": "tsx src/features/squat/replay.ts",
     "check:bundle": "expo export --platform ios --platform android",
     "postinstall": "patch-package"

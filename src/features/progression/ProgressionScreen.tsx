@@ -19,9 +19,9 @@ export function ProgressionScreen() {
     <Text style={styles.title}>Every rep starts here.</Text>
     <Card>
       {error ? <><Text style={styles.body}>{error}</Text><Action title="Retry" onPress={() => setRetry(retry + 1)} /></> : player ? <>
-        <Text style={styles.heading}>{player.xp === 0 && player.characterLevel === 1 ? 'Initial player state' : 'Saved player state'}</Text>
-        <Text style={styles.body}>Level {player.characterLevel} · {player.xp} XP</Text>
-        <Text style={styles.body}>Saved locally on this phone. Character upgrades and workout rewards are planned.</Text>
+        <Text style={styles.heading}>{player.xp === 0 && player.overallRating === 60 && player.coins === 0 ? 'Initial player state' : 'Saved player state'}</Text>
+        <Text style={styles.body}>{player.overallRating} OVR · {player.xp} XP · {player.coins} coins</Text>
+        <Text style={styles.body}>Completed squat-set rewards are saved locally on this phone.</Text>
       </> : <Text style={styles.body}>Loading local player…</Text>}
     </Card>
   </View>;

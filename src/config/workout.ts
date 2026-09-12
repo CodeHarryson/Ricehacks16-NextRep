@@ -1,2 +1,8 @@
 export const WORKOUT_TARGET_REPS = 5;
-// Game economy is intentionally undecided; no XP is awarded by the scaffold.
+
+/** Temporary solo-set reward policy. Battle and shop rewards remain out of scope. */
+export const WORKOUT_COMPLETION_REWARD = {
+  xp: 25,
+  coins: 0,
+  overallRatingDelta: 1,
+} as const;
