@@ -32,5 +32,7 @@ export interface TrackingUpdate {
   observedAt: number;
   timestampUnit: 'milliseconds';
   clock: 'unix';
+  /** Monotonic session timestamp paired with this health transition. */
+  monotonicTimestamp?: number;
   guidance: string;
 }

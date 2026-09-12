@@ -20,6 +20,10 @@ function monotonicMilliseconds(): number {
   return globalThis.performance?.now?.() ?? Date.now();
 }
 
+const healthUpdate = (status: TrackingUpdate['status'], guidance: string, timestamp = monotonicMilliseconds()): TrackingUpdate => ({
+  status, observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', monotonicTimestamp: timestamp, guidance,
+});
+
 export function useNativePoseAdapter({ active, selectedSide, onFrame, onTracking }: NativePoseAdapterProps) {
   const mounted = useRef(true);
   const lastTimestamp = useRef(-1);
@@ -30,16 +34,16 @@ export function useNativePoseAdapter({ active, selectedSide, onFrame, onTracking
       if (timestamp <= lastTimestamp.current) return;
       const frame = normalizePoseResult(bundle, selectedSide, timestamp);
       if (!frame) {
-        onTracking({ status: 'lost', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: 'Step back until your full body is visible.' });
+        onTracking(healthUpdate('lost', 'Step back until your full body is visible.', timestamp));
         return;
       }
       lastTimestamp.current = timestamp;
-      onTracking({ status: 'tracking', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: 'Tracking body position.' });
+      onTracking(healthUpdate('tracking', 'Tracking body position.', timestamp));
       onFrame(frame);
     },
     onError: (error: DetectionError) => {
       if (!mounted.current) return;
-      onTracking({ status: 'error', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: `Pose tracking error: ${error.message}` });
+      onTracking(healthUpdate('error', `Pose tracking error: ${error.message}`));
     },
   }), [onFrame, onTracking, selectedSide]);
 
@@ -57,7 +61,7 @@ export function useNativePoseAdapter({ active, selectedSide, onFrame, onTracking
 
   useEffect(() => {
     mounted.current = true;
-    onTracking({ status: active ? 'initializing' : 'lost', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: active ? 'Starting on-device pose tracking…' : 'Camera paused.' });
+    onTracking(healthUpdate(active ? 'initializing' : 'lost', active ? 'Starting on-device pose tracking…' : 'Camera paused.'));
     return () => { mounted.current = false; };
   }, [active, onTracking]);
 

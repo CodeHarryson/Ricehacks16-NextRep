@@ -155,8 +155,11 @@ export class SquatAnalyzer implements SquatEngine {
     return this.lastOutput;
   }
 
-  updateTracking(frame: PoseFrame | null): readonly AttemptResult[] {
-    if (frame === null) return this.interrupt(Date.now(), 'Tracking interrupted').attempts;
+  updateTracking(frame: PoseFrame | null, interruptionTimestamp?: number): readonly AttemptResult[] {
+    if (frame === null) {
+      const timestamp = interruptionTimestamp ?? this.lastOutput.timestamp ?? 0;
+      return this.interrupt(timestamp, 'Tracking interrupted').attempts;
+    }
     return this.process(frame).attempts;
   }
 

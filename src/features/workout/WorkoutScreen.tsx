@@ -23,7 +23,7 @@ export function WorkoutScreen() {
   const onTracking = useCallback((update: TrackingUpdate) => {
     setTracking(update);
     if ((update.status === 'lost' || update.status === 'error') && !interrupted.current) {
-      const attempt = analyzer.updateTracking(null).at(-1); if (attempt) setLatestAttempt(attempt);
+      const attempt = analyzer.updateTracking(null, update.monotonicTimestamp).at(-1); if (attempt) setLatestAttempt(attempt);
       setPhase(analyzer.snapshot.phase); interrupted.current = true;
     }
     if (update.status === 'tracking') interrupted.current = false;
