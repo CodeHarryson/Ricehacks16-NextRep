@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import { Camera, GeoJSONSource, Layer, Map, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
+import { Camera, CircleLayer, MapView, MarkerView, ShapeSource, type CameraRef } from '@maplibre/maplibre-react-native';
 import { Action, Card, styles } from '../../components/ui';
 import { LOCATION_CONFIG } from '../../config/location';
 import { fetchNearby, publishPresence, stopPresence, type NearbyUser } from './api';
@@ -106,18 +106,18 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
     {status === 'permission-denied' && <Card><Text style={styles.body}>Location permission is denied. Enable it in Settings to share your position.</Text></Card>}
     {status === 'location-disabled' && <Card><Text style={styles.body}>Location services are disabled on this device.</Text></Card>}
     {status === 'offline' && <Card><Text style={styles.body}>Presence service is unavailable. Your location is not being shared until it reconnects.</Text></Card>}
-    {center && styleUrl && !mapLoadFailed && <Map style={{ height: 360, borderRadius: 20, overflow: 'hidden' }} mapStyle={styleUrl} attribution logo onDidFinishLoadingMap={() => setMapLoadFailed(false)} onDidFailLoadingMap={() => setMapLoadFailed(true)}>
-      <Camera ref={camera} initialViewState={{ center, zoom: 15 }} />
-      <GeoJSONSource id="demo-workout-zones" data={DEMO_WORKOUT_ZONES}>
-        <Layer id="demo-zone-circles" type="circle" style={{ circleColor: ['get', 'color'], circleRadius: 24, circleOpacity: 0.28, circleStrokeColor: '#ffffff', circleStrokeWidth: 1 }} />
-      </GeoJSONSource>
-      {center && <Marker id="current-user" lngLat={center}><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#22d3ee', borderWidth: 3, borderColor: '#ffffff' }} /></Marker>}
-      {mapNearby.map((person) => <Marker key={person.userId} id={person.userId} lngLat={nearbyToLngLat(person)} onPress={() => setSelectedOpponent(person)}><Animated.View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#ff4fd8', borderWidth: 2, borderColor: '#ffb347', transform: [{ scale: pulse }] }} /></Marker>)}
-    </Map>}
+    {center && styleUrl && !mapLoadFailed && <MapView style={{ height: 360, borderRadius: 20, overflow: 'hidden' }} mapStyle={styleUrl} attributionEnabled logoEnabled onDidFinishLoadingMap={() => setMapLoadFailed(false)} onDidFailLoadingMap={() => setMapLoadFailed(true)}>
+      <Camera ref={camera} defaultSettings={{ centerCoordinate: center, zoomLevel: 15 }} />
+      <ShapeSource id="demo-workout-zones" shape={DEMO_WORKOUT_ZONES}>
+        <CircleLayer id="demo-zone-circles" style={{ circleColor: ['get', 'color'], circleRadius: 24, circleOpacity: 0.28, circleStrokeColor: '#ffffff', circleStrokeWidth: 1 }} />
+      </ShapeSource>
+      {center && <MarkerView coordinate={center} allowOverlap><View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#22d3ee', borderWidth: 3, borderColor: '#ffffff' }} /></MarkerView>}
+      {mapNearby.map((person) => <MarkerView key={person.userId} coordinate={nearbyToLngLat(person)} allowOverlap><Pressable onPress={() => setSelectedOpponent(person)}><Animated.View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#ff4fd8', borderWidth: 2, borderColor: '#ffb347', transform: [{ scale: pulse }] }} /></Pressable></MarkerView>)}
+    </MapView>}
     {mapLoadFailed && <Card><Text style={styles.body}>{mapUnavailableMessage()}</Text></Card>}
     {status === 'empty' && <Text style={styles.body}>No active nearby users.</Text>}
     {nearby.length > 0 && <Text style={styles.body}>{nearby.length} nearby user{nearby.length === 1 ? '' : 's'} · closest {nearby[0]?.distanceMeters} m</Text>}
-    {selectedOpponent && <Card><Text style={styles.heading}>{selectedOpponent.displayName}</Text><Text style={styles.body}>Approximately {selectedOpponent.distanceMeters} m away.</Text><Action title="Challenge this user" onPress={() => { camera.current?.flyTo({ center: nearbyToLngLat(selectedOpponent), zoom: 16, duration: 700 }); setTimeout(() => onOpenChallenges(selectedOpponent), 700); }} /></Card>}
+    {selectedOpponent && <Card><Text style={styles.heading}>{selectedOpponent.displayName}</Text><Text style={styles.body}>Approximately {selectedOpponent.distanceMeters} m away.</Text><Action title="Challenge this user" onPress={() => { camera.current?.flyTo(nearbyToLngLat(selectedOpponent), 700); setTimeout(() => onOpenChallenges(selectedOpponent), 700); }} /></Card>}
     <Action title="View challenges" onPress={() => onOpenChallenges(null)} />
     {sharing ? <Action title="Stop sharing location" onPress={() => { void stopSharing(); }} /> : user && <Action title="Start sharing location" onPress={() => { void startSharing(user); }} />}
   </View>;
