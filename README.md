@@ -145,7 +145,8 @@ Set both development URLs in a local ignored `.env` (see `.env.example`):
 `EXPO_PUBLIC_SIMULATOR_API_URL=http://127.0.0.1:3000` is used automatically by an
 iOS Simulator. The runtime selects the endpoint using Expo Device, so the same
 development build works in both environments. Set
-`EXPO_PUBLIC_PRODUCTION_API_URL` for production builds. The map uses a generated demo user
+`EXPO_PUBLIC_PRODUCTION_API_URL` for production builds; `preview`/`production` EAS builds
+fail unless it is a real `https` URL (placeholders are rejected). The map uses a generated demo user
 ID stored locally until authentication exists. This is demo-only behavior, not
 identity or access control. Presence is foreground-only, expires after 60 seconds,
 and is quantized before other users see it; use `npm run --prefix server cleanup`

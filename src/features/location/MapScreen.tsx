@@ -25,6 +25,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
   const [selectedOpponent, setSelectedOpponent] = useState<NearbyUser | null>(null);
   const styleUrl = mapStyleUrl();
   const [mapLoadFailed, setMapLoadFailed] = useState(!styleUrl);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const simulationEnabled = typeof __DEV__ !== 'undefined' && __DEV__ || process.env.EXPO_PUBLIC_ENABLE_LOCATION_SIMULATION === 'true';
   const [locationMode, setLocationMode] = useState<'real' | 'simulated'>('real');
   const [testRole, setTestRole] = useState<LocationTestRole>('real');
@@ -88,7 +89,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
   const selectLocationMode = useCallback(async (role: LocationTestRole) => {
     if (!user) return;
     await saveLocationTestRole(role); setTestRole(role);
-    if (role === 'real') { setLocationMode('real'); currentRef.current = null; setCurrent(null); lastSent.current = null; await startSharing(user); }
+    if (role === 'real') { setLocationMode('real'); currentRef.current = null; setCurrent(null); setMapLoaded(false); lastSent.current = null; await startSharing(user); }
     else await startSimulation(user, role);
   }, [startSharing, startSimulation, user]);
   const center: [number, number] | undefined = useMemo(() => current ? [current.longitude, current.latitude] : undefined, [current]);
@@ -110,10 +111,11 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
     return () => { cancelled = true; mounted.current = false; watcher.current?.remove(); watcher.current = null; if (poller.current) clearInterval(poller.current); poller.current = null; if (demoUserForCleanup) void stopPresence(demoUserForCleanup.userId).catch(() => undefined); };
   }, [simulationEnabled, startSharing, startSimulation]);
   useEffect(() => {
-    if (!center || mapLoadFailed) return;
+    // Watchdog only for the initial style load; `center` changes on every GPS update.
+    if (!center || mapLoaded || mapLoadFailed) return;
     const timeout = setTimeout(() => setMapLoadFailed(true), 10_000);
     return () => clearTimeout(timeout);
-  }, [center, mapLoadFailed]);
+  }, [center, mapLoaded, mapLoadFailed]);
   useEffect(() => {
     const animation = Animated.loop(Animated.sequence([
       Animated.timing(pulse, { toValue: 1.18, duration: 900, useNativeDriver: true }),
@@ -133,7 +135,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
     {status === 'offline' && <Card><Text style={styles.body}>Presence service is unavailable. Your location is not being shared until it reconnects.</Text></Card>}
     {simulationEnabled && <Card><Text style={styles.heading}>Development location test</Text><Text style={styles.body}>Choose Test Player A on one device and Test Player B on the other. Keep both map screens open; presence expires after approximately one minute.</Text><View style={{ gap: 8 }}><Action title="Test Player A" onPress={() => { void selectLocationMode('playerA'); }} /><Action title="Test Player B" onPress={() => { void selectLocationMode('playerB'); }} /><Action title="Use real device GPS" onPress={() => { void selectLocationMode('real'); }} /></View></Card>}
     {simulationEnabled && <Card><Text style={styles.heading}>API diagnostics</Text><Text style={styles.body}>API: {locationApiConfig.apiUrl}</Text><Text style={styles.body}>Device: {locationApiConfig.mode}</Text><Text style={styles.body}>Health: {apiHealth === 'reachable' ? 'reachable' : apiHealth === 'unreachable' ? 'unreachable' : 'checking…'}</Text><Text style={styles.body}>Location mode: {locationMode}{locationMode === 'simulated' ? ` (${testRole === 'playerA' ? 'Test Player A' : 'Test Player B'})` : ''}</Text><Text style={styles.body}>User ID: {user?.userId ?? 'loading…'}</Text><Text style={styles.body}>Last publish: {lastPublishAt ?? '—'}</Text><Text style={styles.body}>Last nearby poll: {lastNearbyPollAt ?? '—'}</Text><Text style={styles.body}>Latest API error: {latestApiError ?? '—'}</Text><Action title="Check API health" onPress={() => { void runHealthCheck(); }} /></Card>}
-    {center && styleUrl && !mapLoadFailed && <MapView style={{ height: 360, borderRadius: 20, overflow: 'hidden' }} mapStyle={styleUrl} attributionEnabled logoEnabled onDidFinishLoadingMap={() => setMapLoadFailed(false)} onDidFailLoadingMap={() => setMapLoadFailed(true)}>
+    {center && styleUrl && !mapLoadFailed && <MapView style={{ height: 360, borderRadius: 20, overflow: 'hidden' }} mapStyle={styleUrl} attributionEnabled logoEnabled onDidFinishLoadingMap={() => { setMapLoaded(true); setMapLoadFailed(false); }} onDidFailLoadingMap={() => setMapLoadFailed(true)}>
       <Camera ref={camera} defaultSettings={{ centerCoordinate: center, zoomLevel: 15 }} />
       <ShapeSource id="demo-workout-zones" shape={DEMO_WORKOUT_ZONES}>
         <CircleLayer id="demo-zone-circles" style={{ circleColor: ['get', 'color'], circleRadius: 24, circleOpacity: 0.28, circleStrokeColor: '#ffffff', circleStrokeWidth: 1 }} />
