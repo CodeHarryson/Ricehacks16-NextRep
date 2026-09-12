@@ -16,11 +16,30 @@ function assertProductionApiUrl() {
   }
 }
 
+/** Local builds and development-client EAS profiles; release profiles return false. */
+function isDevelopmentBuild() {
+  const profile = process.env.EAS_BUILD_PROFILE;
+  return !profile || eas.build?.[profile]?.developmentClient === true;
+}
+
 module.exports = ({ config }) => {
   assertProductionApiUrl();
   return {
     ...config,
     ...base.expo,
+    ios: {
+      ...base.expo.ios,
+      infoPlist: {
+        ...base.expo.ios?.infoPlist,
+        // Physical devices reach the dev API over plain http on the Mac's LAN IP. ATS
+        // NSAllowsLocalNetworking only covers private ranges and IP literals can't be
+        // exception domains, so dev builds allow arbitrary loads; release builds stay strict.
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: isDevelopmentBuild(),
+          NSAllowsLocalNetworking: true,
+        },
+      },
+    },
     android: {
       ...base.expo.android,
       permissions: [
