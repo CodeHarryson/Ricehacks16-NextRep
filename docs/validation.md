@@ -15,8 +15,11 @@ Java runtime and adb were not available. No physical devices were tested.
 
 The development map includes local Test Player A/B coordinates so testing does
 not depend on the iOS Simulator Features → Location menu. Start the API with
-`npm run --prefix server start`, start the development client with `npm start`,
-and set the same reachable `EXPO_PUBLIC_API_URL` on both devices. Select Test
+`npm run --prefix server start`, then launch `npx expo start --dev-client --lan --clear`.
+Keep `EXPO_PUBLIC_API_URL` set to the Mac LAN address and
+`EXPO_PUBLIC_SIMULATOR_API_URL=http://127.0.0.1:3000` in the same ignored `.env`.
+The runtime selects the LAN URL on a physical phone and loopback on an iOS
+Simulator; no environment change or rebuild is needed. Select Test
 Player A on one device and Test Player B on the other, keep both map screens
 open, and verify the diagnostics card reports a reachable API and recent
 publishes/polls. Presence expires after approximately one minute. Use “Use real

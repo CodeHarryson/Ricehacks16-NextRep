@@ -12,8 +12,8 @@ actual implemented-versus-planned status are in the [implementation plan](docs/I
 
 Use Node 24 (validated with 24.18.0) and npm (validated with 11.16.0).
 Node must be at least 20.19.4. The base app can run without Tiger Data, but the
-nearby map requires the presence server, a Tiger Data connection, and
-`EXPO_PUBLIC_API_URL`. Do not use Expo Go; custom native code requires a
+nearby map requires the presence server, a Tiger Data connection, and API
+configuration. Do not use Expo Go; custom native code requires a
 development build. No frames are uploaded, recorded or stored by this scaffold.
 
 ```sh
@@ -140,8 +140,12 @@ npm run --prefix server migrate
 npm run --prefix server start
 ```
 
-Set `EXPO_PUBLIC_API_URL` in a local ignored `.env` (see `.env.example`) to the
-reachable API URL for the development device. The map uses a generated demo user
+Set both development URLs in a local ignored `.env` (see `.env.example`):
+`EXPO_PUBLIC_API_URL` is the Mac LAN URL used by a physical phone, while
+`EXPO_PUBLIC_SIMULATOR_API_URL=http://127.0.0.1:3000` is used automatically by an
+iOS Simulator. The runtime selects the endpoint using Expo Device, so the same
+development build works in both environments. Set
+`EXPO_PUBLIC_PRODUCTION_API_URL` for production builds. The map uses a generated demo user
 ID stored locally until authentication exists. This is demo-only behavior, not
 identity or access control. Presence is foreground-only, expires after 60 seconds,
 and is quantized before other users see it; use `npm run --prefix server cleanup`
@@ -154,9 +158,10 @@ Player B on the other, and leave both map screens open. Presence expires after
 approximately one minute. The demo API accepts client-generated demo user IDs;
 these are not production authentication.
 
-For a physical phone, use the Mac’s LAN address instead of `localhost`, for
-example `EXPO_PUBLIC_API_URL=http://192.168.1.20:3000`, then restart Expo so both
-clients receive the same URL.
+For a physical phone, keep the Mac’s LAN address (currently
+`http://168.5.171.62:3000`) in `EXPO_PUBLIC_API_URL`; do not change it when testing
+the simulator. Start the API with `npm run --prefix server start`, then launch
+`npx expo start --dev-client --lan --clear`.
 
 The mobile test script uses Node's `--import tsx` loader instead of the `tsx`
 command-line wrapper. This avoids the wrapper's temporary IPC listener, which is

@@ -1,6 +1,6 @@
 import type { NearbyUser } from '../location/api';
+import { API_URL } from '../../config/api';
 
-const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 export type ChallengeStatus = 'pending' | 'accepted' | 'configuring' | 'ready' | 'active' | 'declined' | 'expired' | 'cancelled';
 export interface ChallengeConfig { exercise: 'bodyweight_squat'; setCount: number; targetReps: number; restSeconds: number; matchTimeLimitSeconds: number; configVersion: number; }
 export interface Challenge {
@@ -23,7 +23,17 @@ export interface ChallengeResult { resultId: string; challengeId: string; partic
 export interface ChallengeResolution { status: 'pending' | 'resolved' | 'cancelled'; winnerId?: string | null; winningScore?: number; resolvedAt?: string | null; }
 
 async function request(path: string, init: RequestInit): Promise<Response> {
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...init, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') throw new Error('Challenge API request timed out after 8 seconds');
+    throw error instanceof Error ? error : new Error('Challenge API is unreachable');
+  }
+  clearTimeout(timeout);
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
     const message = body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string' ? (body as { error: string }).error : `Challenge API returned ${response.status}`;

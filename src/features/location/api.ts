@@ -1,7 +1,7 @@
 import { LOCATION_CONFIG } from '../../config/location';
+import { API_URL, apiRuntimeConfig } from '../../config/api';
 import type { Coordinates } from './throttle';
 
-const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 export interface NearbyUser { userId: string; displayName: string; position: Coordinates; distanceMeters: number; lastSeenAt: string; }
 export interface PresencePayload extends Coordinates { userId: string; displayName: string; accuracyMeters: number; capturedAt: string; }
 
@@ -34,4 +34,4 @@ export async function fetchNearby(userId: string, coordinates: Coordinates): Pro
   return (body as { users: NearbyUser[] }).users;
 }
 export async function stopPresence(userId: string): Promise<void> { await request('/presence', { method: 'DELETE', headers: { 'x-user-id': userId } }); }
-export const locationApiConfig = { apiUrl: API_URL, nearbyRadiusMeters: LOCATION_CONFIG.nearbyRadiusMeters } as const;
+export const locationApiConfig = { apiUrl: API_URL, mode: apiRuntimeConfig.mode, nearbyRadiusMeters: LOCATION_CONFIG.nearbyRadiusMeters } as const;

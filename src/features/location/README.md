@@ -6,8 +6,10 @@ is stored locally until authentication exists; it is not an identity system.
 
 When `__DEV__` is enabled, choose Test Player A on one device and Test Player B
 on the other to publish deterministic nearby coordinates without simulator
-location controls. Both devices must run the same bundle, use the same reachable
-API base URL, and remain on the map screen. “Use real device GPS” restores normal
+location controls. Both devices must run the same bundle and API server. The
+runtime selects `EXPO_PUBLIC_SIMULATOR_API_URL` for the iOS Simulator and the
+LAN `EXPO_PUBLIC_API_URL` for a physical phone; keep both values in the same
+ignored `.env`. Remain on the map screen. “Use real device GPS” restores normal
 foreground location behavior.
 
 The client requests foreground location only while `MapScreen` is mounted. GPS
