@@ -5,6 +5,9 @@ NextRep is a React Native fitness-game scaffold for HackRice 16. Target: physica
 iOS and Android phones; team deadline Sunday, September 13, 2026, 8 a.m. Central.
 Scope: camera setup → native pose boundary → future five-squat set → saved upgrade.
 
+The current product scope, battle/consistency decisions, ownership, milestones, and
+actual implemented-versus-planned status are in the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+
 ## Setup
 
 Use Node 24 (validated with 24.18.0) and npm (validated with 11.16.0).
