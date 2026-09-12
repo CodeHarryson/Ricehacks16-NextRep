@@ -7,14 +7,14 @@ import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { useNativePoseAdapter } from './nativePoseAdapter';
 import { PoseOverlay } from './PoseOverlay';
 
-export function NativePoseCamera({ device, active, position, faceStartActive, onFrame, onTracking, onInitialized, onError }: {
+export function NativePoseCamera({ device, active, position, faceStartActive, onFrame, onTracking, onPreviewStarted, onError }: {
   device: CameraDevice;
   active: boolean;
   position: 'front' | 'back';
   faceStartActive: boolean;
   onFrame: (frame: PoseFrame) => void;
   onTracking: (update: TrackingUpdate) => void;
-  onInitialized: () => void;
+  onPreviewStarted: () => void;
   onError: (message: string) => void;
 }) {
   const [overlayFrame, setOverlayFrame] = useState<PoseFrame | null>(null);
@@ -49,6 +49,7 @@ export function NativePoseCamera({ device, active, position, faceStartActive, on
     style={StyleSheet.absoluteFill}
     device={device}
     resizeMode="contain"
+    androidPreviewViewType="texture-view"
     pixelFormat="rgb"
     isActive={active}
     photo={false}
@@ -58,8 +59,8 @@ export function NativePoseCamera({ device, active, position, faceStartActive, on
     frameProcessor={solution.frameProcessor}
     onLayout={handleLayout}
     onOutputOrientationChanged={solution.cameraOrientationChangedHandler}
-    onInitialized={onInitialized}
-    onError={(error) => onError(`Camera unavailable: ${error.code}`)}
+    onPreviewStarted={onPreviewStarted}
+    onError={(error) => onError(`Camera unavailable: ${error.code} — ${error.message}`)}
     />
     <PoseOverlay frame={overlayFrame} width={layout.width} height={layout.height} mirrored={false} visible={faceStartActive} />
   </View>;

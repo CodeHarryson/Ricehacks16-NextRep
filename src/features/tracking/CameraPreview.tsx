@@ -36,7 +36,7 @@ export function CameraPreview({ faceStartActive, onFrame, onTracking }: { faceSt
   </View>;
   return <View style={{ gap: 12 }}>
     <View style={cameraStyles.preview}>
-      {device ? <NativePoseCamera device={device} active={active} position={position} faceStartActive={faceStartActive} onFrame={onFrame} onTracking={onTracking} onInitialized={() => { setReady(true); setError(null); }} onError={(message) => { setReady(false); setError(message); }} /> :
+      {device ? <NativePoseCamera device={device} active={active} position={position} faceStartActive={faceStartActive} onFrame={onFrame} onTracking={onTracking} onPreviewStarted={() => { setReady(true); setError(null); }} onError={(message) => { setReady(false); setError(message); }} /> :
         <Text style={styles.body}>No {position} camera available on this device.</Text>}
     </View>
     <Text style={styles.body}>{error ?? (!active ? 'Camera paused while app is inactive.' : ready ? 'Camera preview • on-device pose tracking' : 'Waiting for camera preview…')}</Text>

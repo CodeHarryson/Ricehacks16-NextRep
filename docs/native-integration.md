@@ -70,6 +70,13 @@ cross into JavaScript as raw images.
 5. Release the detector and invalidate any active attempt on navigation,
    backgrounding, tracking loss and camera switches. Then connect the pure engine.
 
+The workout camera is inside a rounded container that clips its contents. Vision
+Camera defaults to Android `SurfaceView`, which does not support clipping, masks,
+transparency, or rotation. NextRep selects
+`androidPreviewViewType="texture-view"` for this composed preview and marks the
+camera ready only after `onPreviewStarted`. Pose inference still consumes native
+RGB frames and is unaffected by the preview rendering mode.
+
 ## Algorithm reference and licensing
 
 [LearnOpenCV's squat trainer](https://github.com/spmallick/learnopencv/tree/master/AI-Fitness-Trainer-Using-MediaPipe-Analyzing-Squats)
