@@ -4,8 +4,9 @@ import { Action, Card, styles } from '../../components/ui';
 import { acceptChallenge, acceptChallengeConfig, createChallenge, declineChallenge, listChallenges, startChallenge, updateChallengeConfig, type Challenge, type ChallengeConfig } from './api';
 import { loadDemoUser, type DemoUser } from '../location/identity';
 import type { NearbyUser } from '../location/api';
+import { isValidWorkoutSession, type WorkoutSessionConfig } from '../workout/session';
 
-interface ChallengeScreenProps { opponent: NearbyUser | null; onBack: () => void; onStartWorkout: () => void; }
+interface ChallengeScreenProps { opponent: NearbyUser | null; onBack: () => void; onStartWorkout: (session: WorkoutSessionConfig) => void; }
 const editable = (config: ChallengeConfig) => ({ exercise: config.exercise, setCount: config.setCount, targetReps: config.targetReps, restSeconds: config.restSeconds, matchTimeLimitSeconds: config.matchTimeLimitSeconds });
 export function ChallengeScreen({ opponent, onBack, onStartWorkout }: ChallengeScreenProps) {
   const [user, setUser] = useState<DemoUser | null>(null); const [challenges, setChallenges] = useState<Challenge[]>([]); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export function ChallengeScreen({ opponent, onBack, onStartWorkout }: ChallengeS
   useEffect(() => { let mounted = true; void loadDemoUser().then((demoUser) => { if (!mounted) return; setUser(demoUser); void refresh(demoUser); }).catch(() => { if (mounted) { setError('Could not load demo identity.'); setLoading(false); } }); return () => { mounted = false; }; }, [refresh]);
   useEffect(() => { if (!user) return; const timer = setInterval(() => { void refresh(user); }, 5000); return () => clearInterval(timer); }, [refresh, user]);
   const activeChallenge = useMemo(() => challenges.find((item) => ['accepted', 'configuring', 'ready', 'active'].includes(item.status) && (item.senderId === user?.userId || item.receiverId === user?.userId)), [challenges, user]);
-  useEffect(() => { if (activeChallenge?.status === 'active') onStartWorkout(); }, [activeChallenge, onStartWorkout]);
+  useEffect(() => { if (activeChallenge?.status !== 'active') return; const session: unknown = { mode: 'challenge', ...activeChallenge.configuration, challengeId: activeChallenge.challengeId }; if (isValidWorkoutSession(session)) onStartWorkout(session); else setError('The shared workout configuration is invalid; camera session not started.'); }, [activeChallenge, onStartWorkout]);
   const mutate = async (operation: () => Promise<Challenge>) => { setBusy(true); setError(null); try { const updated = await operation(); setChallenges((current) => current.some((item) => item.challengeId === updated.challengeId) ? current.map((item) => item.challengeId === updated.challengeId ? updated : item) : [updated, ...current]); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Challenge request failed.'); } finally { setBusy(false); } };
   const respond = (challenge: Challenge, action: 'accept' | 'decline') => { if (user) void mutate(() => action === 'accept' ? acceptChallenge(user.userId, challenge.challengeId) : declineChallenge(user.userId, challenge.challengeId)); };
   const config = activeChallenge?.configuration;

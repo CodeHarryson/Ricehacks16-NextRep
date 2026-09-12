@@ -7,10 +7,12 @@ import { MapScreen } from './src/features/location/MapScreen';
 import { ChallengeScreen } from './src/features/challenge/ChallengeScreen';
 import type { NearbyUser } from './src/features/location/api';
 import { WorkoutScreen } from './src/features/workout/WorkoutScreen';
+import type { WorkoutSessionConfig } from './src/features/workout/session';
 
 export default function App() {
   const [screen, setScreen] = useState<'home' | 'workout' | 'progression' | 'map' | 'challenge'>('home');
   const [challengeOpponent, setChallengeOpponent] = useState<NearbyUser | null>(null);
+  const [workoutSession, setWorkoutSession] = useState<WorkoutSessionConfig | undefined>();
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (screen === 'home') return false;
@@ -27,12 +29,12 @@ export default function App() {
         <Text style={styles.body}>Five squats. One small step toward your next level.</Text>
         <Card><Text style={styles.heading}>Your next rep starts with you.</Text>
         <Text style={styles.body}>Track a live squat set or see approximate nearby demo users.</Text></Card>
-        <Action title="Start workout" onPress={() => setScreen('workout')} />
+        <Action title="Start workout" onPress={() => { setWorkoutSession(undefined); setScreen('workout'); }} />
         <Action title="View progression" onPress={() => setScreen('progression')} />
         <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
         <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={() => setScreen('workout')} />}
+        {screen === 'workout' ? <WorkoutScreen session={workoutSession} /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
       </>}
     </ScrollView>
   </SafeAreaView></SafeAreaProvider>;
