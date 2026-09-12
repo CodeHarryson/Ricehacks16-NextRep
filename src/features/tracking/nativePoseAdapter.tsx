@@ -5,6 +5,7 @@ import {
   usePoseDetection,
   type DetectionError,
   type PoseDetectionResultBundle,
+  type ViewCoordinator,
 } from 'react-native-mediapipe';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { normalizePoseResult, POSE_MODEL_ASSET } from './poseAdapter';
@@ -28,11 +29,11 @@ export function useNativePoseAdapter({ active, selectedSide, onFrame, onTracking
   const mounted = useRef(true);
   const lastTimestamp = useRef(-1);
   const callbacks = useMemo(() => ({
-    onResults: (bundle: PoseDetectionResultBundle) => {
+    onResults: (bundle: PoseDetectionResultBundle, coordinator: ViewCoordinator) => {
       if (!mounted.current) return;
       const timestamp = monotonicMilliseconds();
       if (timestamp <= lastTimestamp.current) return;
-      const frame = normalizePoseResult(bundle, selectedSide, timestamp);
+      const frame = normalizePoseResult(bundle, selectedSide, timestamp, coordinator.getFrameDims(bundle));
       if (!frame) {
         onTracking(healthUpdate('lost', 'Step back until your full body is visible.', timestamp));
         return;
@@ -55,7 +56,6 @@ export function useNativePoseAdapter({ active, selectedSide, onFrame, onTracking
     delegate: Delegate.CPU,
     mirrorMode: 'no-mirror',
     forceOutputOrientation: 'portrait',
-    forceCameraOrientation: 'portrait',
     fpsMode: 15,
   });
 

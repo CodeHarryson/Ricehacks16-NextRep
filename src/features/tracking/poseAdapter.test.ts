@@ -27,8 +27,9 @@ test('normalization preserves only detector-supplied visibility and presence', (
       { x: 0.3, y: 0.4, z: -0.2, presence: 0.7 },
       { x: 0.5, y: 0.6, z: -0.3 },
     ]] }],
-  }, 'unknown', 12.5);
+  }, 'unknown', 12.5, { width: 640, height: 480 });
 
+  assert.deepEqual(frame?.image, { width: 640, height: 480 });
   assert.equal(frame?.landmarks[0]?.visibility, 0.8);
   assert.equal(frame?.landmarks[1]?.presence, 0.7);
   assert.equal(frame?.landmarks[2]?.visibility, undefined);

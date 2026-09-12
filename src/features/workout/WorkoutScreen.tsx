@@ -6,7 +6,7 @@ import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { CameraPreview } from '../tracking/CameraPreview';
 import { selectVisibleSide } from '../tracking/poseAdapter';
-import { SquatAnalyzer, type SquatPhase } from '../squat/engine';
+import { DEFAULT_RUBRIC, SquatAnalyzer, type AnalyzerOutput, type SquatPhase } from '../squat/engine';
 
 function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): string {
   if (rejectedReason?.includes('visibility') || rejectedReason?.includes('framing') || rejectedReason?.includes('missing')) {
@@ -34,6 +34,8 @@ export function WorkoutScreen() {
   const [latestAttempt, setLatestAttempt] = useState<AttemptResult | null>(null);
   const [analysisGuidance, setAnalysisGuidance] = useState('Step back until your full body is visible, then turn sideways.');
   const [analysisNeutral, setAnalysisNeutral] = useState(true);
+  const [measurement, setMeasurement] = useState<AnalyzerOutput['feature']>(null);
+  const [trackingDetail, setTrackingDetail] = useState('Waiting for accepted landmarks.');
   const interrupted = useRef(false);
   const onFrame = useCallback((frame: PoseFrame) => {
     if (selectedSide.current === null) {
@@ -49,6 +51,8 @@ export function WorkoutScreen() {
     if (activeAnalyzer === null) return;
     const output = activeAnalyzer.process({ ...frame, view: selectedSide.current });
     setPhase(output.phase);
+    setMeasurement(output.feature);
+    setTrackingDetail(output.rejectedReason ?? 'Landmarks accepted.');
     setAnalysisGuidance(guidanceForOutput(output.phase, output.rejectedReason));
     setAnalysisNeutral(output.tracking !== 'tracking' || output.rejectedReason !== null);
     const attempt = output.attempts[output.attempts.length - 1];
@@ -74,6 +78,8 @@ export function WorkoutScreen() {
       <Text accessibilityLiveRegion="polite" style={styles.heading}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
       <Text style={styles.body}>Visible side: {selectedSide.current ?? 'not selected yet'}</Text>
       <Text style={styles.body}>Phase: {phase}</Text>
+      <Text style={styles.body}>Movement range: {measurement ? `${measurement.rangeFromStandingDeg.toFixed(1)}°` : '—'} (minimum {DEFAULT_RUBRIC.minimumRangeDeg}°)</Text>
+      <Text style={styles.body}>Tracking detail: {trackingDetail}</Text>
       <Text style={styles.heading}>Reps: {reps}/{WORKOUT_TARGET_REPS}</Text>
       <Text style={styles.body}>{latestAttempt ? `Latest attempt: ${latestAttempt.rating ?? 'neutral'} — ${latestAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
     </Card>

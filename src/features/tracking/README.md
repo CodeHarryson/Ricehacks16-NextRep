@@ -28,6 +28,13 @@ wrapper. The Android 0.6.0 bridge omits MediaPipe visibility and presence values
 default; `patches/react-native-mediapipe+0.6.0.patch` preserves those detector values
 without inventing replacements. `patch-package` reapplies this after installation.
 
+Physical camera buffers commonly retain a landscape sensor size even while the
+detector outputs upright portrait landmarks. The adapter uses
+`ViewCoordinator.getFrameDims(...)` from each result callback for the corresponding
+upright image dimensions and does not force the sensor orientation to portrait.
+This keeps normalized landmarks and the pixel geometry used for thigh inclination
+in the same coordinate system.
+
 During setup, NextRep compares detector-supplied visibility for the left and right
 shoulder, hip, knee, and ankle. It selects the usable side with the higher total and
 holds that anatomical side for the analyzer session. Until one side is usable, the

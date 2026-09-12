@@ -45,14 +45,15 @@ export function normalizePoseResult(
   bundle: NativePoseResultBundle,
   view: 'left' | 'right' | 'unknown',
   timestamp: number,
+  orientedImage = { width: bundle.inputImageWidth, height: bundle.inputImageHeight },
 ): PoseFrame | null {
   const landmarks = bundle.results[0]?.landmarks[0];
-  if (!landmarks?.length || bundle.inputImageWidth <= 0 || bundle.inputImageHeight <= 0) return null;
+  if (!landmarks?.length || orientedImage.width <= 0 || orientedImage.height <= 0) return null;
   return {
     timestamp,
     timestampUnit: 'milliseconds',
     clock: 'monotonic-session',
-    image: { width: bundle.inputImageWidth, height: bundle.inputImageHeight },
+    image: orientedImage,
     coordinateSpace: 'normalized-image',
     view,
     landmarks: landmarks.map((landmark, index) => ({
