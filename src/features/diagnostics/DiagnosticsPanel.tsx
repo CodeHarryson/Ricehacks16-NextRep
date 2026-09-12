@@ -6,6 +6,7 @@ import { spacing } from '../../theme/tokens';
 import { formatSyncTime } from '../challenge/connectionStatus';
 import { checkApiHealth, locationApiConfig } from '../location/api';
 import { diagnosticsEnabled, diagnosticsStore } from './diagnosticsStore';
+import { mapRuntimeConfig } from '../../config/map';
 
 const time = (value: number | null) => value === null ? '—' : formatSyncTime(value);
 
@@ -35,11 +36,16 @@ function DiagnosticsContent() {
       <Row label="API URL" value={locationApiConfig.apiUrl} />
       <Row label="Device mode" value={locationApiConfig.mode} />
       <Row label="API health" value={snapshot.apiHealth} />
+      <Row label="API configuration" value={locationApiConfig.status} />
       <Row label="Last API error" value={snapshot.lastApiError ?? '—'} />
+      <Row label="Map style configuration" value={mapRuntimeConfig.status} />
+      <Row label="Camera permission" value={snapshot.cameraPermission} />
+      <Row label="Location permission" value={snapshot.locationPermission} />
+      <Row label="Location services" value={snapshot.locationServices} />
       <Row label="Last challenge sync" value={time(snapshot.lastChallengeSyncAt)} />
       <Row label="Last result sync" value={time(snapshot.lastResultSyncAt)} />
-      <Row label="Challenge ID" value={snapshot.challengeId ?? '—'} />
-      <Row label="User ID" value={snapshot.userId ?? '—'} />
+      <Row label="Current challenge ID" value={snapshot.challengeId ?? '—'} />
+      <Row label="Current demo user ID" value={snapshot.userId ?? '—'} />
       <Row label="Location mode" value={snapshot.locationMode} />
     </View>
     <Action title={checking ? 'Checking…' : 'Check API health'} variant="secondary" size="sm" disabled={checking} onPress={runHealthCheck} />

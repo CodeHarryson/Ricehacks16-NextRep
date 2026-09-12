@@ -23,6 +23,7 @@ npm ci
 npm run typecheck
 npm run lint
 npm run check:bundle
+npm run check:native-config
 npm run prebuild
 ```
 
@@ -43,6 +44,13 @@ pod install --project-directory=ios
 npm run ios
 # Later JS-only sessions, after the development app is installed:
 npm start
+```
+
+Cloud development-build commands (after EAS login and profile environment setup):
+
+```sh
+npx eas-cli@latest build --profile development-simulator --platform ios
+npx eas-cli@latest build --profile development --platform ios
 ```
 
 Connect and trust the iPhone, enable Developer Mode, and select it when prompted.
@@ -78,6 +86,12 @@ adb reverse tcp:8081 tcp:8081
 npm start
 ```
 
+Cloud Android development build:
+
+```sh
+npx eas-cli@latest build --profile development --platform android
+```
+
 Enable USB debugging and accept the computer authorization on the phone. Linux
 and Windows developers should use their local JDK/SDK paths. Standalone native
 check: `cd android && ./gradlew :app:assembleDebug`.
@@ -91,7 +105,9 @@ React/React Native selection.
 | Package | Version |
 | --- | --- |
 | Expo / development client | 54.0.37 / 6.0.21 |
+| Expo Device / Expo Location / Expo Font | 8.0.10 / 19.0.8 / 14.0.12 |
 | React Native / React | 0.81.5 / 19.1.0 |
+| MapLibre React Native | 10.4.2 |
 | VisionCamera / Worklets Core | 4.7.3 / 1.6.2 |
 | react-native-mediapipe (live-stream integration; phone validation pending) | 0.6.0 |
 | AsyncStorage / safe-area-context | 2.2.0 / 5.6.0 |
@@ -143,7 +159,9 @@ npm run --prefix server start
 Set both development URLs in a local ignored `.env` (see `.env.example`):
 `EXPO_PUBLIC_API_URL` is the Mac LAN URL used by a physical phone, while
 `EXPO_PUBLIC_SIMULATOR_API_URL=http://127.0.0.1:3000` is used automatically by an
-iOS Simulator. The runtime selects the endpoint using Expo Device, so the same
+iOS Simulator. Android Emulator uses
+`EXPO_PUBLIC_ANDROID_EMULATOR_API_URL=http://10.0.2.2:3000`. The runtime selects
+the endpoint using Expo Device and platform, so the same
 development build works in both environments. Set
 `EXPO_PUBLIC_PRODUCTION_API_URL` for production builds; `preview`/`production` EAS builds
 fail unless it is a real `https` URL (placeholders are rejected). The map uses a generated demo user
@@ -159,8 +177,8 @@ Player B on the other, and leave both map screens open. Presence expires after
 approximately one minute. The demo API accepts client-generated demo user IDs;
 these are not production authentication.
 
-For a physical phone, keep the Mac’s LAN address (currently
-`http://168.5.171.62:3000`) in `EXPO_PUBLIC_API_URL`; do not change it when testing
+For a physical phone, put the Mac’s current LAN URL (for example,
+`http://192.168.x.x:3000`) in `EXPO_PUBLIC_API_URL`; do not change it when testing
 the simulator. Start the API with `npm run --prefix server start`, then launch
 `npx expo start --dev-client --lan --clear`.
 
@@ -172,18 +190,36 @@ isolated test worker behavior. Run the usual `npm test` command.
 ### MapLibre / MapTiler setup
 
 The nearby map uses one MapLibre native map on iOS and Android with a hosted
-MapTiler style. Create a MapTiler key and supply both values locally (never
-commit them):
+MapTiler style. Create a MapTiler key, put both values in the ignored `.env`
+(never commit the key), and restart Metro:
 
 ```sh
 EXPO_PUBLIC_MAPTILER_API_KEY='your-local-key' \\
 EXPO_PUBLIC_MAP_STYLE_URL='https://api.maptiler.com/maps/base-v4/style.json' \\
-npx expo prebuild --no-install
+npx expo start --dev-client --lan --clear
 ```
 
-The style URL receives the key safely at runtime when it does not already have
-one. Rebuild the development app after changing map configuration; Expo Go is
-not supported for this native module. The Android package is `com.nextrep.hackrice`.
+The style URL receives the key safely from its separate environment value at
+runtime. After MapLibre is compiled into the development client, changing only
+either map environment value needs a Metro restart/rebundle, not another native
+compile. Expo Go is not supported for this native module. The Android package is
+`com.nextrep.hackrice`.
+
+### What requires a native rebuild
+
+Run `npm run prebuild`, reinstall pods on iOS, and create/reinstall a development
+client after changing `app.json`, `app.config.js`, native config plugins, native
+dependencies (including MapLibre, VisionCamera, MediaPipe, Expo Location, or Expo
+Font), permission declarations, the bundled pose model/plugin, deployment targets,
+bundle/package identifiers, or native dependency patches. JavaScript/TypeScript,
+copy, ordinary PNGs, and `EXPO_PUBLIC_*` API/map values require a fresh Metro
+bundle (and a new release binary when shipping), but do not by themselves require
+a new development client when its native modules are unchanged.
+
+The current Stage 4 change includes permission and EAS/native configuration edits,
+so **a new native development build is required**. Run the checklist in
+[device-validation.md](docs/device-validation.md); no physical-device verification
+is claimed yet.
 
 ## First real-phone test: camera → landmarks
 

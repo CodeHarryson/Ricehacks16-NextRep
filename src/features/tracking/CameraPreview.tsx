@@ -5,6 +5,8 @@ import { Action, styles } from '../../components/ui';
 import { colors, radii } from '../../theme/tokens';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { NativePoseCamera } from './NativePoseCamera';
+import { diagnosticsStore } from '../diagnostics/diagnosticsStore';
+import { cameraPermissionMessage } from '../diagnostics/deviceStatus';
 
 export function CameraPreview({ faceStartActive, onFrame, onTracking }: { faceStartActive: boolean; onFrame: (frame: PoseFrame) => void; onTracking: (update: TrackingUpdate) => void }) {
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -15,11 +17,13 @@ export function CameraPreview({ faceStartActive, onFrame, onTracking }: { faceSt
   const [position, setPosition] = useState<'front' | 'back'>('front');
   const device = useCameraDevice(position);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    const updatePermissionDiagnostic = () => diagnosticsStore.update({ cameraPermission: cameraPermissionMessage(Camera.getCameraPermissionStatus()) });
+    updatePermissionDiagnostic();
+    const subscription = AppState.addEventListener('change', (state) => { setActive(state === 'active'); if (state === 'active') updatePermissionDiagnostic(); });
     return () => subscription.remove();
-  }, []);
+  }, [hasPermission]);
   async function askPermission() {
-    try { setDenied(!(await requestPermission())); }
+    try { const granted = await requestPermission(); setDenied(!granted); diagnosticsStore.update({ cameraPermission: cameraPermissionMessage(Camera.getCameraPermissionStatus()) }); }
     catch { setError('Camera permission could not be requested. Open Settings and try again.'); }
   }
   async function openSettings() {

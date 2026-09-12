@@ -1,5 +1,35 @@
 # Validation — 2026-09-11
 
+## Stage 4 readiness update — 2026-09-12
+
+No simulator, emulator, or physical device was launched during Stage 4, so none
+of the native runtime behavior below is represented as verified. The pending
+matrix and evidence requirements are in
+[device-validation.md](device-validation.md).
+
+- `npm test`: passed, 123/123 tests.
+- `npm test --prefix server`: passed, 16/16 tests.
+- Root and server `typecheck`: passed.
+- `npm run lint`: passed.
+- `git diff --check`: passed.
+- `npm run check:native-config`: passed five native/configuration checks and
+  `expo config --type public` evaluation.
+- `npx expo install --check`: passed using Expo's local SDK 54 dependency map;
+  network lookup was unavailable. This check identified and Stage 4 updated
+  `expo-device` from 7.0.3 to the SDK-compatible 8.0.10.
+- `npm run check:bundle`: passed for iOS (810 modules) and Android (818 modules).
+  The export listed all three Nunito faces and all avatar/navigation/workout PNG
+  density variants. This remains JavaScript/asset evidence only.
+- `npm run prebuild`: passed without cleaning the generated projects. Generated
+  iOS/Android files contain the foreground camera/location entries, microphone
+  removal, and pose model. Existing non-blocking warnings remain: no custom app
+  icon and `expo-system-ui` is not installed.
+
+Because Stage 4 changes permissions, EAS profiles, and the native `expo-device`
+dependency, a new development client must be built. The historical compiler/tool
+blockers and all physical-device tests below remain open until new evidence
+replaces them.
+
 ## Environment and repository
 
 Inspected Git status/history, root files and ancestor AGENTS.md locations. The

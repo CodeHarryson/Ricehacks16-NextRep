@@ -6,10 +6,13 @@ export interface DiagnosticsSnapshot {
   lastResultSyncAt: number | null;
   challengeId: string | null;
   userId: string | null;
+  cameraPermission: string;
+  locationPermission: string;
+  locationServices: string;
   locationMode: string;
 }
 
-export const INITIAL_DIAGNOSTICS: DiagnosticsSnapshot = { apiHealth: 'unknown', lastApiError: null, lastChallengeSyncAt: null, lastResultSyncAt: null, challengeId: null, userId: null, locationMode: 'not started' };
+export const INITIAL_DIAGNOSTICS: DiagnosticsSnapshot = { apiHealth: 'unknown', lastApiError: null, lastChallengeSyncAt: null, lastResultSyncAt: null, challengeId: null, userId: null, cameraPermission: 'not checked', locationPermission: 'not checked', locationServices: 'not checked', locationMode: 'not started' };
 
 export function createDiagnosticsStore(initial: DiagnosticsSnapshot = INITIAL_DIAGNOSTICS) {
   let snapshot = initial;

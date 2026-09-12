@@ -7,7 +7,8 @@ const PLACEHOLDER_HOST = /(^|\.)(example\.(com|net|org)|[^.]+\.(example|invalid|
 /** Fail release EAS builds (non development-client profiles) that would ship without a real API. */
 function assertProductionApiUrl() {
   const profile = process.env.EAS_BUILD_PROFILE;
-  if (!profile || eas.build?.[profile]?.developmentClient) return;
+  const productionBuild = process.env.NEXTREP_BUILD_ENV === 'production' || (profile && !eas.build?.[profile]?.developmentClient);
+  if (!productionBuild) return;
   const value = process.env.EXPO_PUBLIC_PRODUCTION_API_URL?.trim();
   let url;
   try { url = value ? new URL(value) : null; } catch { url = null; }
@@ -19,6 +20,7 @@ function assertProductionApiUrl() {
 /** Local builds and development-client EAS profiles; release profiles return false. */
 function isDevelopmentBuild() {
   const profile = process.env.EAS_BUILD_PROFILE;
+  if (process.env.NEXTREP_BUILD_ENV === 'production') return false;
   return !profile || eas.build?.[profile]?.developmentClient === true;
 }
 

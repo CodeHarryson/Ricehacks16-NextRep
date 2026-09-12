@@ -6,6 +6,7 @@ export interface NearbyUser { userId: string; displayName: string; position: Coo
 export interface PresencePayload extends Coordinates { userId: string; displayName: string; accuracyMeters: number; capturedAt: string; }
 
 async function request(path: string, init: RequestInit): Promise<Response> {
+  if (apiRuntimeConfig.status !== 'configured') throw new Error(apiRuntimeConfig.issue ?? 'API configuration is invalid');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   let response: Response;
@@ -34,4 +35,4 @@ export async function fetchNearby(userId: string, coordinates: Coordinates): Pro
   return (body as { users: NearbyUser[] }).users;
 }
 export async function stopPresence(userId: string): Promise<void> { await request('/presence', { method: 'DELETE', headers: { 'x-user-id': userId } }); }
-export const locationApiConfig = { apiUrl: API_URL, mode: apiRuntimeConfig.mode, nearbyRadiusMeters: LOCATION_CONFIG.nearbyRadiusMeters } as const;
+export const locationApiConfig = { apiUrl: API_URL || 'not configured', mode: apiRuntimeConfig.mode, status: apiRuntimeConfig.status, issue: apiRuntimeConfig.issue, nearbyRadiusMeters: LOCATION_CONFIG.nearbyRadiusMeters } as const;

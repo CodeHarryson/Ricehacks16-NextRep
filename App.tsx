@@ -15,6 +15,7 @@ import { WorkoutScreen } from './src/features/workout/WorkoutScreen';
 import type { WorkoutSessionConfig } from './src/features/workout/session';
 import { backTarget, centerAction, isBottomNavVisible, shouldMountMap, TAB_SCREENS, type Screen } from './src/navigation/navigation';
 import { FontGate } from './src/theme/FontGate';
+import { StartupDiagnostics } from './src/features/diagnostics/StartupDiagnostics';
 import { colors, spacing } from './src/theme/tokens';
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
     <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
     <FontGate>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <StartupDiagnostics />
         {screen === 'home' && <HomeScreen onStartWorkout={startSoloWorkout} onOpenMap={() => setScreen('map')} onOpenProgression={() => setScreen('progression')} />}
         {inWorkout && <>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

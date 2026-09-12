@@ -10,9 +10,10 @@
     "prebuild": "expo prebuild --no-install",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --import tsx --test src/features/squat/*.test.ts src/features/tracking/*.test.ts src/features/workout/*.test.ts src/features/progression/*.test.ts src/features/location/*.test.ts src/features/challenge/*.test.ts src/features/diagnostics/*.test.ts src/navigation/*.test.ts src/theme/*.test.ts",
+    "test": "node --env-file=.env.example --import tsx --test src/config/*.test.ts src/features/squat/*.test.ts src/features/tracking/*.test.ts src/features/workout/*.test.ts src/features/progression/*.test.ts src/features/location/*.test.ts src/features/challenge/*.test.ts src/features/diagnostics/*.test.ts src/navigation/*.test.ts src/theme/*.test.ts",
     "replay": "tsx src/features/squat/replay.ts",
     "check:bundle": "expo export --platform ios --platform android",
+    "check:native-config": "node --import tsx --test src/config/nativeReadiness.test.ts && expo config --type public",
     "postinstall": "patch-package"
   },
   "engines": {
@@ -24,7 +25,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "54.0.37",
     "expo-dev-client": "6.0.21",
-    "expo-device": "~7.0.3",
+    "expo-device": "~8.0.10",
     "expo-font": "~14.0.12",
     "expo-location": "~19.0.8",
     "react": "19.1.0",

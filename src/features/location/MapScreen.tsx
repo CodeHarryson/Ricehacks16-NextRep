@@ -9,6 +9,7 @@ import { borders, colors, elevation, radii, spacing, typography, weight } from '
 import { usePlayerSummary } from '../progression/usePlayerSummary';
 import { DiagnosticsPanel } from '../diagnostics/DiagnosticsPanel';
 import { diagnosticsStore } from '../diagnostics/diagnosticsStore';
+import { locationPermissionMessage } from '../diagnostics/deviceStatus';
 import { LOCATION_CONFIG } from '../../config/location';
 import { checkApiHealth, fetchNearby, publishPresence, stopPresence, type NearbyUser } from './api';
 import { loadDemoUser, type DemoUser } from './identity';
@@ -79,7 +80,9 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
     setSharing(true);
     try {
       const permission = await Location.getForegroundPermissionsAsync();
-      const availability = locationAvailability(permission.status === Location.PermissionStatus.GRANTED, await Location.hasServicesEnabledAsync());
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      diagnosticsStore.update({ locationPermission: locationPermissionMessage(permission.status), locationServices: servicesEnabled ? 'enabled' : 'disabled' });
+      const availability = locationAvailability(permission.status === Location.PermissionStatus.GRANTED, servicesEnabled);
       if (availability !== 'ready') { setStatus(availability); return; }
       watcher.current?.remove();
       watcher.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Balanced, timeInterval: LOCATION_CONFIG.presenceUpdateIntervalMs, distanceInterval: LOCATION_CONFIG.minimumMovementMeters }, (location) => {
@@ -112,8 +115,11 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
       const savedRole = await loadLocationTestRole(); if (cancelled) return; setTestRole(savedRole);
       if (simulationEnabled && savedRole !== 'real') { await startSimulation(demoUser, savedRole); return; }
       const permission = await Location.requestForegroundPermissionsAsync();
+      diagnosticsStore.update({ locationPermission: locationPermissionMessage(permission.status) });
       if (permission.status !== Location.PermissionStatus.GRANTED) { setStatus('permission-denied'); return; }
-      if (!(await Location.hasServicesEnabledAsync())) { setStatus('location-disabled'); return; }
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      diagnosticsStore.update({ locationServices: servicesEnabled ? 'enabled' : 'disabled' });
+      if (!servicesEnabled) { setStatus('location-disabled'); return; }
       try {
         const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }); if (cancelled) return;
         const coordinates = coordinatesOf(location); currentRef.current = coordinates; setCurrent(coordinates); await startSharing(demoUser);

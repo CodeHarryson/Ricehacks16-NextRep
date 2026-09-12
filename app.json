@@ -11,6 +11,7 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "NextRep uses your camera for on-device workout tracking.",
+        "NSLocationWhenInUseUsageDescription": "NextRep uses your location to show approximate nearby demo users.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -20,20 +21,22 @@
         "android.permission.RECORD_AUDIO"
       ],
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "plugins": [
       "expo-dev-client",
       "./plugins/withPoseLandmarkerModel",
       [
-      "react-native-vision-camera",
+        "react-native-vision-camera",
         {
           "cameraPermissionText": "NextRep uses your camera for on-device workout tracking.",
           "enableMicrophonePermission": false
         }
-      ]
-      ,[
+      ],
+      [
         "expo-location",
         { "locationWhenInUsePermission": "NextRep uses your location to show approximate nearby demo users." }
       ]

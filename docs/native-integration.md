@@ -86,3 +86,32 @@ no file matching `license`, and `/master/LICENSE` returned 404. Applicable reuse
 terms remain unresolved. **No LearnOpenCV source, thresholds, videos or assets
 were copied.** Obtain applicable permission/license before copying any source;
 implement the gameplay state machine independently in TypeScript.
+
+## Stage 4 native build readiness
+
+The evaluated Expo configuration includes foreground camera and location usage
+text on iOS, `CAMERA`, `ACCESS_FINE_LOCATION`, and `ACCESS_COARSE_LOCATION` on
+Android, and explicitly blocks audio recording. It requests no background
+location. The MapLibre config plugin, development client, VisionCamera permission
+plugin, Expo Location plugin, and pose-model config plugin are all part of the
+generated native projects. `newArchEnabled=false` remains aligned with the
+MediaPipe adapter compatibility decision above.
+
+Development runtime configuration is environment-only: iOS Simulator uses
+`EXPO_PUBLIC_SIMULATOR_API_URL`, Android Emulator prefers
+`EXPO_PUBLIC_ANDROID_EMULATOR_API_URL`, physical devices use
+`EXPO_PUBLIC_API_URL`, and release profiles require a non-placeholder HTTPS
+`EXPO_PUBLIC_PRODUCTION_API_URL`. MapTiler key and style URL also come only from
+`EXPO_PUBLIC_*` values. Missing or invalid development values appear in an
+on-screen startup warning and the development-only diagnostics panel.
+
+The panel reports API URL/device mode/health, MapTiler status, camera and location
+permission state, location services, challenge/result sync times, active challenge,
+and demo user. It renders only when `__DEV__` is true. Nunito is loaded as
+Metro-packaged assets through Expo Font; an error or three-second timeout
+permanently selects the system-font fallback for that session. PNG art uses static
+React Native `require` calls with 1x/2x/3x files.
+
+Configuration and bundle checks do not prove native compilation or device
+behavior. The authoritative pending matrix is
+[device-validation.md](device-validation.md).

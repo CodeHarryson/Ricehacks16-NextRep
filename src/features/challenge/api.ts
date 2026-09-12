@@ -1,5 +1,5 @@
 import type { NearbyUser } from '../location/api';
-import { API_URL } from '../../config/api';
+import { API_URL, apiRuntimeConfig } from '../../config/api';
 
 export type ChallengeStatus = 'pending' | 'accepted' | 'configuring' | 'ready' | 'active' | 'declined' | 'expired' | 'cancelled';
 export interface ChallengeConfig { exercise: 'bodyweight_squat'; setCount: number; targetReps: number; restSeconds: number; matchTimeLimitSeconds: number; configVersion: number; }
@@ -23,6 +23,7 @@ export interface ChallengeResult { resultId: string; challengeId: string; partic
 export interface ChallengeResolution { status: 'pending' | 'resolved' | 'cancelled'; winnerId?: string | null; winningScore?: number; resolvedAt?: string | null; }
 
 async function request(path: string, init: RequestInit): Promise<Response> {
+  if (apiRuntimeConfig.status !== 'configured') throw new Error(apiRuntimeConfig.issue ?? 'API configuration is invalid');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   let response: Response;
