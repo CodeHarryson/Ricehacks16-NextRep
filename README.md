@@ -151,6 +151,11 @@ One-device API/map-path testing is complete. Two-device proximity testing remain
 planned for the next stage. The demo API accepts client-generated demo user IDs;
 these are not production authentication.
 
+The mobile test script uses Node's `--import tsx` loader instead of the `tsx`
+command-line wrapper. This avoids the wrapper's temporary IPC listener, which is
+blocked by some macOS sandboxed hosts (`listen EPERM`), while keeping Node's
+isolated test worker behavior. Run the usual `npm test` command.
+
 ## First real-phone test: camera → landmarks
 
 - [ ] Install the development build on one iPhone and one Android. Record OS,

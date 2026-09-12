@@ -250,3 +250,18 @@ test('one result is cancelled after the deadline using the opponent no-show rule
   const later = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'receiver', 'x-idempotency-key': 'late-key' }, body: JSON.stringify(resultRequest(sessionStart, deadline, 5, 'late-key')) });
   assert.equal(later.status, 409); assert.equal(resolution.winner_id, null); assert.equal(resolution.winning_score, null);
 });
+
+test('GET results cancels a pending one-sided challenge after its deadline', async () => {
+  const startedAt = new Date(Date.now() - 50_000);
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: startedAt });
+  const { db, results, resolution, queries } = resolutionDb(challenge);
+  results.push({ result_id: 'existing', challenge_id: 'c1', participant_id: 'sender', config_version: 1, exercise: 'bodyweight_squat', counted_reps: 1, green_reps: 1, yellow_reps: 0, red_attempts: 0, neutral_attempts: 0, total_score: 110, score_policy_version: 'score-v1', started_at: new Date(startedAt.getTime() + 10_000), ended_at: new Date(startedAt.getTime() + 40_000), submitted_at: new Date(), idempotency_key: 'existing-key' });
+  const app = createApp(db);
+  const first = await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'sender' } });
+  assert.equal(first.status, 200);
+  assert.deepEqual((await first.json()).resolution, { status: 'cancelled', resolvedAt: resolution.resolved_at?.toISOString() });
+  assert.equal(resolution.winner_id, null); assert.equal(resolution.winning_score, null);
+  assert.ok(queries.some((sql) => sql.includes("resolution_status = 'cancelled'") && sql.includes('winner_id = NULL')));
+  const second = await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'sender' } });
+  assert.equal((await second.json()).resolution.status, 'cancelled');
+});

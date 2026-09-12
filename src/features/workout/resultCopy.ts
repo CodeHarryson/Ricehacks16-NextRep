@@ -6,3 +6,7 @@ export function challengeScoreResolutionCopy(status: ChallengeResolutionDisplay)
   if (status === 'cancelled') return 'Challenge cancelled — opponent did not submit.';
   return 'Waiting for server resolution.';
 }
+
+export function canGrantBattleReward(status: ChallengeResolutionDisplay): boolean {
+  return status === 'resolved';
+}
