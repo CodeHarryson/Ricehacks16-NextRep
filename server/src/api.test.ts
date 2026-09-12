@@ -135,3 +135,22 @@ test('shared configuration validates, resets acceptance, reaches ready, and star
   const startRetry = await app.request(`${base}/start`, { method: 'POST', headers: { 'x-user-id': 'sender' } });
   assert.equal(startRetry.status, 200);
 });
+
+test('challenge result submission recalculates score and is retry-safe', async () => {
+  const challenge = challengeRow({ status: 'active', config_version: 2, exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, expires_at: new Date(Date.now() + 60_000) });
+  const stored = { result_id: 'r1', challenge_id: 'c1', participant_id: 'sender', config_version: 2, exercise: 'bodyweight_squat', counted_reps: 2, green_reps: 1, yellow_reps: 1, red_attempts: 1, neutral_attempts: 1, total_score: 210, score_policy_version: 'score-v1', started_at: new Date(1), ended_at: new Date(2), submitted_at: new Date(3), idempotency_key: 'k1' };
+  let inserted = false;
+  const db = { query: async <T>(sql: string) => {
+    if (sql.includes('SELECT * FROM challenges')) return { rows: [challenge as T], rowCount: 1 };
+    if (sql.includes('challenge_participant_results') && sql.startsWith('SELECT') && sql.includes('participant_id')) return { rows: inserted ? [stored as T] : [], rowCount: inserted ? 1 : 0 };
+    if (sql.includes('INSERT INTO challenge_participant_results')) { inserted = true; return { rows: [], rowCount: 1 }; }
+    if (sql.includes('challenge_participant_results')) return { rows: [stored as T], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  } };
+  const app = createApp(db);
+  const request = { configVersion: 2, exercise: 'bodyweight_squat', countedReps: 99, greenReps: 1, yellowReps: 1, redAttempts: 1, neutralAttempts: 1, totalScore: 9999, startedAt: new Date(1).toISOString(), endedAt: new Date(2).toISOString(), idempotencyKey: 'k1' };
+  const first = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'k1' }, body: JSON.stringify(request) });
+  assert.equal(first.status, 201); assert.equal((await first.json()).result.totalScore, 210);
+  const retry = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'k1' }, body: JSON.stringify(request) });
+  assert.equal(retry.status, 200);
+});

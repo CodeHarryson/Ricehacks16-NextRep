@@ -20,6 +20,7 @@ export const initialPlayer = (): PlayerState => ({
   completedWorkoutIds: [],
 });
 const KEY = '@nextrep/player/v1';
+const PERFORMANCE_KEY = '@nextrep/performance/v1';
 
 interface StorageDriver {
   getItem(key: string): Promise<string | null>;
@@ -111,6 +112,23 @@ export interface CompletedWorkoutReward {
   coins: number;
   overallRatingDelta: number;
 }
+
+export interface WorkoutPerformance {
+  performanceId: string; workoutId: string; userId?: string; mode: 'solo' | 'challenge'; exercise: string; setCount: number; targetReps: number; matchDurationSeconds: number; startedAt: string; endedAt: string; countedReps: number; greenReps: number; yellowReps: number; redAttempts: number; neutralAttempts: number; totalScore: number; scorePolicyVersion: string;
+}
+export async function saveWorkoutPerformance(performance: WorkoutPerformance): Promise<void> {
+  if (!performance.performanceId || !performance.workoutId) throw new Error('Performance requires IDs.');
+  await serialized(async () => {
+    const raw = await storage.getItem(PERFORMANCE_KEY); let records: WorkoutPerformance[] = [];
+    if (raw) { try { const parsed: unknown = JSON.parse(raw); if (Array.isArray(parsed)) records = parsed as WorkoutPerformance[]; } catch { records = []; } }
+    if (records.some((item) => item.performanceId === performance.performanceId)) return;
+    await storage.setItem(PERFORMANCE_KEY, JSON.stringify([...records, performance]));
+  });
+}
+export const loadWorkoutPerformances = (): Promise<WorkoutPerformance[]> => serialized(async () => {
+  const raw = await storage.getItem(PERFORMANCE_KEY); if (!raw) return [];
+  try { const parsed: unknown = JSON.parse(raw); return Array.isArray(parsed) ? parsed as WorkoutPerformance[] : []; } catch { return []; }
+});
 
 export async function grantCompletedWorkout(reward: CompletedWorkoutReward): Promise<{ player: PlayerState; granted: boolean }> {
   if (!reward.workoutId || !reward.rewardId || !isNonNegativeInteger(reward.xp) ||

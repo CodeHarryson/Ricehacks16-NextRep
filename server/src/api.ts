@@ -7,6 +7,7 @@ import { quantizeCoordinate, validatePresence, type PresenceInput } from './vali
 
 type PresenceRow = { user_id: string; display_name: string; latitude: number; longitude: number; captured_at: Date | string; distance_meters: number };
 type ChallengeRow = { challenge_id: string; sender_id: string; receiver_id: string; sender_display_name: string; receiver_display_name: string; status: string; created_at: Date | string; expires_at: Date | string; accepted_at: Date | string | null; proximity_meters: number; exercise: string; set_count: number; target_reps: number; rest_seconds: number; match_time_limit_seconds: number; config_version: number; sender_accepted_at: Date | string | null; receiver_accepted_at: Date | string | null; started_at: Date | string | null };
+type ResultRow = { result_id: string; challenge_id: string; participant_id: string; config_version: number; exercise: string; counted_reps: number; green_reps: number; yellow_reps: number; red_attempts: number; neutral_attempts: number; total_score: number; score_policy_version: string; started_at: Date | string; ended_at: Date | string; submitted_at: Date | string; idempotency_key: string };
 type ChallengeConfigInput = { exercise: string; setCount: number; targetReps: number; restSeconds: number; matchTimeLimitSeconds: number };
 const configResponse = (row: ChallengeRow) => ({ exercise: row.exercise ?? 'bodyweight_squat', setCount: row.set_count ?? 1, targetReps: row.target_reps ?? 5, restSeconds: row.rest_seconds ?? 30, matchTimeLimitSeconds: row.match_time_limit_seconds ?? 300, configVersion: row.config_version ?? 1 });
 const challengeResponse = (row: ChallengeRow) => ({
@@ -25,6 +26,7 @@ const challengeResponse = (row: ChallengeRow) => ({
   locked: row.status === 'ready' || row.status === 'active',
   startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
 });
+const resultResponse = (row: ResultRow) => ({ resultId: row.result_id, challengeId: row.challenge_id, participantId: row.participant_id, configVersion: row.config_version, exercise: row.exercise, countedReps: row.counted_reps, greenReps: row.green_reps, yellowReps: row.yellow_reps, redAttempts: row.red_attempts, neutralAttempts: row.neutral_attempts, totalScore: row.total_score, scorePolicyVersion: row.score_policy_version, startedAt: new Date(row.started_at).toISOString(), endedAt: new Date(row.ended_at).toISOString(), submittedAt: new Date(row.submitted_at).toISOString() });
 const parseConfig = (body: unknown): ChallengeConfigInput | string => {
   if (!body || typeof body !== 'object') return 'invalid configuration';
   const raw = body as Record<string, unknown>;
@@ -222,6 +224,43 @@ export function createApp(db: DbClient = pool): Hono {
     const declined = result.rows[0];
     if (!declined) return context.json({ error: 'challenge update failed' }, 500);
     return context.json({ challenge: challengeResponse(declined) });
+  });
+  app.post('/challenges/:id/result', async (context) => {
+    const participantId = context.req.header('x-user-id');
+    if (!participantId) return context.json({ error: 'x-user-id is required' }, 400);
+    let body: unknown; try { body = await context.req.json(); } catch { return context.json({ error: 'invalid JSON' }, 400); }
+    const raw = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const idempotencyKey = context.req.header('x-idempotency-key') ?? (typeof raw.idempotencyKey === 'string' ? raw.idempotencyKey : '');
+    const challengeResult = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), participantId]);
+    const challenge = challengeResult.rows[0];
+    if (!challenge) return context.json({ error: 'challenge not found' }, 404);
+    if (!['active', 'expired'].includes(challenge.status)) return context.json({ error: 'challenge is not active' }, 409);
+    const existing = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2', [challenge.challenge_id, participantId]);
+    if (existing.rows[0]) return context.json({ result: resultResponse(existing.rows[0]) });
+    const required = ['configVersion', 'exercise', 'greenReps', 'yellowReps', 'redAttempts', 'neutralAttempts', 'startedAt', 'endedAt'];
+    if (!idempotencyKey || required.some((key) => !(key in raw))) return context.json({ error: 'result fields and x-idempotency-key are required' }, 400);
+    const numbers = ['configVersion', 'greenReps', 'yellowReps', 'redAttempts', 'neutralAttempts'].map((key) => raw[key]);
+    if (raw.exercise !== challenge.exercise || !numbers.every((value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) || raw.configVersion !== challenge.config_version) return context.json({ error: 'result does not match the locked configuration' }, 400);
+    const green = raw.greenReps as number; const yellow = raw.yellowReps as number; const counted = Math.min(challenge.set_count * challenge.target_reps, green + yellow); const cappedGreen = Math.min(green, counted); const cappedYellow = Math.min(yellow, counted - cappedGreen);
+    const startedAt = typeof raw.startedAt === 'string' ? new Date(raw.startedAt) : new Date(Number.NaN); const endedAt = typeof raw.endedAt === 'string' ? new Date(raw.endedAt) : new Date(Number.NaN);
+    if (!Number.isFinite(startedAt.getTime()) || !Number.isFinite(endedAt.getTime()) || endedAt < startedAt) return context.json({ error: 'invalid result timestamps' }, 400);
+    await db.query(`INSERT INTO challenge_participant_results (result_id, challenge_id, participant_id, config_version, exercise, counted_reps, green_reps, yellow_reps, red_attempts, neutral_attempts, total_score, score_policy_version, started_at, ended_at, idempotency_key) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'score-v1',$12::timestamptz,$13::timestamptz,$14) ON CONFLICT DO NOTHING`, [randomUUID(), challenge.challenge_id, participantId, challenge.config_version, challenge.exercise, counted, cappedGreen, cappedYellow, raw.redAttempts, raw.neutralAttempts, cappedGreen * 110 + cappedYellow * 100, startedAt.toISOString(), endedAt.toISOString(), idempotencyKey]);
+    const inserted = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2', [challenge.challenge_id, participantId]);
+    const result = inserted.rows[0]; if (!result) return context.json({ error: 'result submission failed' }, 500);
+    const allResults = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1', [challenge.challenge_id]);
+    if (allResults.rows.length >= 2 || new Date(challenge.expires_at).getTime() <= Date.now()) {
+      const scores = allResults.rows.map((item) => ({ id: item.participant_id, score: item.total_score })); const winningScore = scores.length ? Math.max(...scores.map((item) => item.score)) : 0; const winners = scores.filter((item) => item.score === winningScore); const winnerId = winners.length === 1 ? winners[0]?.id ?? null : null;
+      await db.query(`UPDATE challenges SET resolution_status = 'resolved', resolved_at = COALESCE(resolved_at, NOW()), winner_id = $2, winning_score = $3 WHERE challenge_id = $1 AND resolution_status <> 'resolved'`, [challenge.challenge_id, winnerId, winningScore]);
+    }
+    return context.json({ result: resultResponse(result) }, 201);
+  });
+  app.get('/challenges/:id/results', async (context) => {
+    const participantId = context.req.header('x-user-id'); if (!participantId) return context.json({ error: 'x-user-id is required' }, 400);
+    const challengeResult = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), participantId]); const challenge = challengeResult.rows[0];
+    if (!challenge) return context.json({ error: 'challenge not found' }, 404);
+    const results = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 ORDER BY submitted_at ASC', [challenge.challenge_id]);
+    const resolution = await db.query<{ resolution_status: string; winner_id: string | null; winning_score: number | null; resolved_at: Date | string | null }>('SELECT resolution_status, winner_id, winning_score, resolved_at FROM challenges WHERE challenge_id = $1', [challenge.challenge_id]);
+    const state = resolution.rows[0]; return context.json({ results: results.rows.map(resultResponse), resolution: state?.resolution_status === 'resolved' ? { status: 'resolved', winnerId: state.winner_id, winningScore: state.winning_score, resolvedAt: state.resolved_at ? new Date(state.resolved_at).toISOString() : null } : { status: 'pending' } });
   });
   return app;
 }
