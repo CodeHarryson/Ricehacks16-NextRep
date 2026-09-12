@@ -296,7 +296,7 @@ gaps remain in [native-integration.md](native-integration.md).
 | App shell | Implemented: Expo/TypeScript app with local home, workout setup, and progression screens. |
 | Camera | Implemented but untested on phones: permission flow, VisionCamera preview, front/back switch, app lifecycle handling. |
 | Native pose | Planned: a `react-native-mediapipe` candidate is installed/autolinked, but the exported adapter explicitly reports “Pose tracking not connected”; no model or landmark output is wired. |
-| Squat logic | Planned: pure `SquatEngine` interface only. No feature computation, tracking gate, state machine, count, rating, or fixture tests. |
+| Squat logic | Partial implementation: `src/features/squat` now has pure pixel-space thigh-inclination features, standing calibration, time smoothing, visibility/framing/view/jump/gap gates, temporal state machine, attempt ratings, exactly-once timestamps, replay fixtures, and deterministic logic tests. Real MediaPipe landmark quality, threshold calibration, and device validation remain planned. |
 | Feedback | Planned: setup text exposes the green/yellow/red/neutral model only through documentation/contracts; no live result display or audio is implemented. |
 | Workout/game control | Partial foundation: five-rep display target and in-memory attempt dedup reducer exist. Sets, rest, match limits, completion, battle scoring, XP and coins are not implemented. |
 | Progression | Partial foundation: initial local player state stores XP, level and processed attempt keys. Earned OVR, coins, rewards, upgrades, durable event processing, weekly target/streak, and last-workout data are not implemented. |

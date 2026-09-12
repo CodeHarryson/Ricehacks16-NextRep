@@ -6,6 +6,8 @@ export type AttemptResult = {
   attemptId: string;
   startedAt: number;
   endedAt: number;
+  /** Maximum inclination change from the calibrated standing baseline, degrees. */
+  peakRange: number;
   reason: string;
   rubricVersion: string;
 } & (

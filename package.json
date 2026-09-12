@@ -10,6 +10,8 @@
     "prebuild": "expo prebuild --no-install",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "tsx --test src/features/squat/*.test.ts",
+    "replay": "tsx src/features/squat/replay.ts",
     "check:bundle": "expo export --platform ios --platform android"
   },
   "engines": {
@@ -34,6 +36,7 @@
     "babel-preset-expo": "54.0.10",
     "eslint": "9.39.1",
     "eslint-config-expo": "10.0.0",
+    "tsx": "4.20.6",
     "typescript": "5.9.2"
   }
 }

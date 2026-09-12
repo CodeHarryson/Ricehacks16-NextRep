@@ -109,7 +109,7 @@ host the native integration; there is no demonstrated need for bare RN.
 | Owner | Files | Status |
 | --- | --- | --- |
 | Camera + native pose | src/features/tracking | Permission flow, preview, lifecycle and explicit missing adapter implemented; detector/model planned |
-| Squat algorithm | src/features/squat | Pure engine interface; features, temporal state machine and rubric planned |
+| Squat algorithm | src/features/squat | CV core implemented with pixel-space thigh inclination, calibration, smoothing, gating, temporal phases, ratings, replay fixtures and deterministic tests; real landmark/device calibration planned |
 | Workout UI + audio | src/features/workout/WorkoutScreen.tsx, src/components | Home/setup/progression UI implemented; event feedback and audio planned |
 | Controller + storage | src/features/workout/controller.ts, src/features/progression | Attempt dedup reducer and local initial-player storage implemented; sets/rest/XP/upgrades planned |
 

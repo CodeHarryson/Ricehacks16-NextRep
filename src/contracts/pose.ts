@@ -5,6 +5,8 @@ export interface PoseFrame {
   clock: 'monotonic-session';
   image: { width: number; height: number };
   coordinateSpace: 'normalized-image';
+  /** Side selected during setup. The analyzer locks this for an attempt. */
+  view?: 'left' | 'right' | 'unknown';
   /** x/y: top-left origin, right/down positive, divided by width/height.
    * z: MediaPipe relative depth, hip midpoint origin, smaller is nearer,
    * approximately the same scale as x. Not meters. Values may leave [0,1]. */
