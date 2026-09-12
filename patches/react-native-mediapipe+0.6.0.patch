@@ -1,8 +1,22 @@
+diff --git a/node_modules/react-native-mediapipe/android/build.gradle b/node_modules/react-native-mediapipe/android/build.gradle
+index c1a3d05..2374665 100644
+--- a/node_modules/react-native-mediapipe/android/build.gradle
++++ b/node_modules/react-native-mediapipe/android/build.gradle
+@@ -102,6 +102,8 @@ dependencies {
+   implementation "com.facebook.react:react-native:+"
+   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+   implementation project(':react-native-vision-camera')
+-  implementation 'com.google.mediapipe:tasks-vision:0.10.2'
++  // 0.10.2 drops landmark visibility/presence in its Android container API.
++  // NextRep needs the detector-supplied values for tracking-health gates.
++  implementation 'com.google.mediapipe:tasks-vision:0.10.14'
+     implementation 'androidx.camera:camera-core:1.3.3'
+ }
 diff --git a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
-index 91523e8..ab0fa68 100644
+index 91523e8..c8dfbe6 100644
 --- a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
 +++ b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
-@@ -13,6 +13,8 @@ fun normalizedLandmarkToWritableMap(landmark: NormalizedLandmark): WritableMap {
+@@ -13,5 +13,7 @@ fun normalizedLandmarkToWritableMap(landmark: NormalizedLandmark): WritableMap {
    map.putDouble("x", landmark.x().toDouble())
    map.putDouble("y", landmark.y().toDouble())
    map.putDouble("z", landmark.z().toDouble())
@@ -10,9 +24,3 @@ index 91523e8..ab0fa68 100644
 +  landmark.presence().ifPresent { map.putDouble("presence", it.toDouble()) }
    return map
  }
- 
-@@ -47,4 +49,3 @@ fun orientationToDegrees(orientation: Orientation): Int =
-     Orientation.LANDSCAPE_RIGHT -> -90
-   }
- 
--

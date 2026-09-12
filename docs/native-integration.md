@@ -29,9 +29,15 @@ cross into JavaScript as raw images.
   Worklets plugin are configured. Two older proposal Babel plugins are explicitly
   pinned because Worklets Core 1.6.2 requests them by name during bundling.
 - Inspect the **installed npm artifact**, not only main: its podspec pins
-  MediaPipeTasksVision **0.10.12** and depends on VisionCamera. Its Android Gradle
-  pins tasks-vision **0.10.2** and camera-core **1.3.3**. GitHub main instead has
-  tasks-vision 0.10.26. Do not silently use main's requirements for npm 0.6.0.
+  MediaPipeTasksVision **0.10.12** and depends on VisionCamera. Its published
+  Android Gradle file pins tasks-vision **0.10.2** and camera-core **1.3.3**.
+  NextRep patches Android to **0.10.14**, the nearest inspected release whose
+  `NormalizedLandmark` API exposes MediaPipe's optional visibility and presence
+  values. The original 0.10.2 API exposes only x/y/z; adding calls to those absent
+  methods caused `:react-native-mediapipe:compileDebugKotlin` to fail in EAS build
+  `5f04878c-c5b0-48e2-9e7b-02ffe5f5dc9b`. GitHub main instead uses tasks-vision
+  0.10.26. The 0.10.14 override and bridge conversion live in
+  `patches/react-native-mediapipe+0.6.0.patch` and are reapplied after installs.
   Gradle resolves CameraX transitives; inspect dependency resolution and test on a
   phone before asserting binary compatibility or Android 16 KB page support.
 - Upstream's README lists iOS 12 / Android minimum 24, but this app's framework
