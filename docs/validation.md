@@ -66,9 +66,25 @@ command and `npm run android`. CameraX/MediaPipe resolution and Android native
 compilation remain unverified.
 
 Neither successful pod resolution nor JavaScript bundling proves native adapter
-compatibility. There is no live landmark or physical-device validation to report.
-The native detector, model resources and timestamp bridge work remain explicit
-next steps in native-integration.md.
+compatibility. The adapter is now wired with the installed `usePoseDetection`
+LIVE_STREAM API, CPU delegate, 15-FPS native throttling, forced portrait/no-mirror
+output, and monotonic callback-arrival timestamps. The model is present in both
+generated native projects, but there is no live landmark or physical-device
+validation to report.
+
+## Integration checks after adapter wiring
+
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
+- `npm test`: passed, 12/12 deterministic analyzer tests.
+- `npm run replay`: passed; clean five-squat fixture produced 5 reps, 5 unique
+  attempt IDs, and READY final phase.
+- `npm run check:bundle`: passed; iOS 654 and Android 652 Metro modules.
+- `npx expo prebuild --no-install`: passed; model copied to both native projects.
+
+Next physical test: build a signed development client, confirm permission and
+preview, verify landmarks reach `SquatAnalyzer`, then compare five squats on one
+iPhone and one Android while recording analyzed FPS and interruption behavior.
 
 ## Dependency advisories
 

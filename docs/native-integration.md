@@ -1,10 +1,10 @@
 # Native integration decision — 2026-09-11
 
 Selected candidate: **react-native-mediapipe 0.6.0**, MIT, by Charles Parker.
-Installed for native autolinking but deliberately not imported by the missing
-adapter: its JavaScript initializes native event emitters/plugins at import time.
-No model or detector is connected yet. This is a candidate baseline, not a verified
-cross-platform CV stack.
+Installed and now connected through `usePoseDetection` in
+`src/features/tracking/nativePoseAdapter.tsx`. The detector runs in
+`RunningMode.LIVE_STREAM` on the native VisionCamera frame processor; frames never
+cross into JavaScript as raw images.
 
 ## Evidence and compatibility
 
@@ -37,24 +37,25 @@ cross-platform CV stack.
 - Upstream's README lists iOS 12 / Android minimum 24, but this app's framework
   minimum is **iOS 15.1 / Android API 24**. Use the higher framework requirement.
 
-## Adapter work before live landmarks
+## Current adapter and model
 
-1. Bundle an official Pose Landmarker `.task` asset; record model version, SHA-256
-   and applicable model license. Use [Google's model documentation](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker).
-   No model is downloaded or redistributed by this scaffold. Native iOS code uses
-   Bundle.main; Android uses assets. A Metro asset reference alone does not put the
-   file in those locations. Add a repeatable local Expo config plugin to copy the
-   asset to Android app assets and register it in iOS Copy Bundle Resources.
-2. Wire usePoseDetection / its frameProcessor to the existing camera, starting with
-   one pose and LIVE_STREAM. Forward layout, device and orientation callbacks.
-   Add initialization/error/cleanup handling. Prevent overlapping detector work.
-3. Correct the timestamp bridge: iOS PdConvertHelpers emits timestampMs (missing
-   in upstream TypeScript result types); Android ConvertHelpers does not emit it.
-   Forward Android result.timestampMs() in a maintained patch/fork. iOS currently
-   supplies Unix time and Android uptime. Normalize to a documented monotonic
-   session clock; do not substitute inferenceTime (a duration) or pretend callback
-   arrival time is capture time. A native monotonic capture timestamp on both
-   platforms is preferred. Preserve ordering and reject stale callbacks.
+1. `assets/pose_landmarker_lite.task` is the official Lite float16 model, version 1,
+   SHA-256 `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`,
+   downloaded from [Google's model URL](https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task).
+   `plugins/withPoseLandmarkerModel.js` copies it into Android `assets` and iOS
+   Copy Bundle Resources. Confirm the model's current redistribution terms before
+   shipping; the npm adapter is MIT and MediaPipe source is Apache-2.0.
+2. `usePoseDetection(callbacks, RunningMode.LIVE_STREAM, 'pose_landmarker_lite.task', options)`
+   is the exact installed 0.6.0 API. Options are one pose, CPU delegate, 0.5
+   detector/presence/tracking minimums, `fpsMode: 15`, `mirrorMode: 'no-mirror'`,
+   and forced portrait output/camera orientation. The package hook releases the
+   detector handle on unmount. Camera lifecycle, front/back selection, permission,
+   and app-active state remain in `CameraPreview`.
+3. The package callback does not expose one consistent capture timestamp in its TS
+   contract (iOS and Android native implementations differ), so the adapter uses
+   monotonic `performance.now()` at result arrival and rejects non-increasing
+   callbacks. This is an explicit session clock, not capture time; a future native
+   patch should forward monotonic capture timestamps on both platforms.
 4. Normalize upright, unmirrored image coordinates and corresponding dimensions
    into PoseFrame. Account for front camera mirroring and preview crop separately.
    Preserve optional visibility/presence only when supplied. Do not fabricate a

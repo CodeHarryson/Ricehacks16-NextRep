@@ -10,6 +10,7 @@
     "android": { "package": "com.nextrep.hackrice", "blockedPermissions": ["android.permission.RECORD_AUDIO"] },
     "plugins": [
       "expo-dev-client",
+      "./plugins/withPoseLandmarkerModel",
       ["react-native-vision-camera", { "cameraPermissionText": "NextRep uses your camera for on-device workout tracking.", "enableMicrophonePermission": false }]
     ]
   }

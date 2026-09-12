@@ -108,16 +108,17 @@ host the native integration; there is no demonstrated need for bare RN.
 
 | Owner | Files | Status |
 | --- | --- | --- |
-| Camera + native pose | src/features/tracking | Permission flow, preview, lifecycle and explicit missing adapter implemented; detector/model planned |
+| Camera + native pose | src/features/tracking | VisionCamera + MediaPipe live-stream adapter, bundled Lite model, permission/lifecycle flow; physical devices pending |
 | Squat algorithm | src/features/squat | CV core implemented with pixel-space thigh inclination, calibration, smoothing, gating, temporal phases, ratings, replay fixtures and deterministic tests; real landmark/device calibration planned |
 | Workout UI + audio | src/features/workout/WorkoutScreen.tsx, src/components | Home/setup/progression UI implemented; event feedback and audio planned |
 | Controller + storage | src/features/workout/controller.ts, src/features/progression | Attempt dedup reducer and local initial-player storage implemented; sets/rest/XP/upgrades planned |
 
 Shared contracts live in `src/contracts`; five-rep goal in `src/config`.
 Screens are intentionally simple local navigation with Android back handling.
-Tracking explicitly says **“Pose tracking not connected.”** No fake counts,
-ratings, rewards or development fixtures exist. Camera and storage behavior remain
-untested on physical devices. A bundle passing does not validate native code.
+Tracking now reports native initialization, tracking, lost and error states and
+feeds valid landmarks into the pure analyzer. No fake counts, ratings, rewards or
+development fixtures are shown in the real workout. Camera and storage behavior
+remain untested on physical devices; a bundle passing does not validate native code.
 
 See [workout ownership notes](src/features/workout/README.md) for end-of-attempt
 rating semantics, neutral tracking loss, controller-owned totals and persistent
