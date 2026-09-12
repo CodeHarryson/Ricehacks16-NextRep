@@ -156,6 +156,22 @@ command-line wrapper. This avoids the wrapper's temporary IPC listener, which is
 blocked by some macOS sandboxed hosts (`listen EPERM`), while keeping Node's
 isolated test worker behavior. Run the usual `npm test` command.
 
+### MapLibre / MapTiler setup
+
+The nearby map uses one MapLibre native map on iOS and Android with a hosted
+MapTiler style. Create a MapTiler key and supply both values locally (never
+commit them):
+
+```sh
+EXPO_PUBLIC_MAPTILER_API_KEY='your-local-key' \\
+EXPO_PUBLIC_MAP_STYLE_URL='https://api.maptiler.com/maps/base-v4/style.json' \\
+npx expo prebuild --no-install
+```
+
+The style URL receives the key safely at runtime when it does not already have
+one. Rebuild the development app after changing map configuration; Expo Go is
+not supported for this native module. The Android package is `com.nextrep.hackrice`.
+
 ## First real-phone test: camera → landmarks
 
 - [ ] Install the development build on one iPhone and one Android. Record OS,
