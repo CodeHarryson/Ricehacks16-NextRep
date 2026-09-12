@@ -46,5 +46,5 @@ export function CameraPreview({ onFrame, onTracking }: { onFrame: (frame: PoseFr
   </View>;
 }
 const cameraStyles = StyleSheet.create({
-  preview: { height: 320, borderRadius: 18, overflow: 'hidden', backgroundColor: '#060A07', justifyContent: 'center', padding: 20 },
+  preview: { height: 480, borderRadius: 18, overflow: 'hidden', backgroundColor: '#060A07', justifyContent: 'center' },
 });

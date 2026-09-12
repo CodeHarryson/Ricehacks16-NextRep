@@ -22,7 +22,7 @@ Required native permissions are camera only: iOS `NSCameraUsageDescription` and
 Android `android.permission.CAMERA`. Build with `npx expo prebuild --no-install`,
 then `npm run ios` or `npm run android` on a signed physical development client.
 
-The camera must report its device and `cover` resize mode to the MediaPipe hook and
+The camera must report its device and `contain` resize mode to the MediaPipe hook and
 request VisionCamera's `rgb` pixel format, matching the installed package's camera
 wrapper. The Android 0.6.0 bridge omits MediaPipe visibility and presence values by
 default; `patches/react-native-mediapipe+0.6.0.patch` preserves those detector values
@@ -40,6 +40,9 @@ shoulder, hip, knee, and ankle. It selects the usable side with the higher total
 holds that anatomical side for the analyzer session. Until one side is usable, the
 screen stays neutral and asks the user to step back. Analyzer rejection reasons are
 translated into neutral framing/reacquisition guidance; they never become red reps.
+The workout preview uses `contain` so the complete portrait analysis image remains
+visible. Its overlay maps the same upright coordinates onto shoulder, hip, knee, and
+ankle dots and connections; green dots identify the side selected for analysis.
 
 ## Comparison reference
 
