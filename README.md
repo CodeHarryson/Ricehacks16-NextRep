@@ -1,2 +1,143 @@
 # Ricehacks16-NextRep
 RiceHacks competition project 
+
+NextRep is a React Native fitness-game scaffold for HackRice 16. Target: physical
+iOS and Android phones; team deadline Sunday, September 13, 2026, 8 a.m. Central.
+Scope: camera setup → native pose boundary → future five-squat set → saved upgrade.
+
+## Setup
+
+Use Node 24 (validated with 24.18.0) and npm (validated with 11.16.0).
+Node must be at least 20.19.4. No environment variables, backend or Expo account
+are needed for local builds. Do not use Expo Go; custom native code requires a
+development build. No frames are uploaded, recorded or stored by this scaffold.
+
+```sh
+git clone https://github.com/CodeHarryson/Ricehacks16-NextRep.git
+cd Ricehacks16-NextRep
+npm ci
+npm run typecheck
+npm run lint
+npm run check:bundle
+npm run prebuild
+```
+
+Native directories are generated and gitignored. Keep durable native changes in
+local modules/config plugins or explicit maintained dependency patches. Do not
+run `prebuild --clean` over teammates' uncommitted native work. The root was
+scaffolded in place; its original README text and `.claude-flow` are preserved.
+
+### iPhone (Mac required)
+
+Install Xcode and its iOS platform, select Xcode in Settings → Locations → Command
+Line Tools, accept its license, and install CocoaPods. This host has Xcode 26.6,
+Swift 6.3.3 and CocoaPods 1.17.0. Minimum phone OS is iOS 15.1.
+
+```sh
+npm run prebuild
+pod install --project-directory=ios
+npm run ios
+# Later JS-only sessions, after the development app is installed:
+npm start
+```
+
+Connect and trust the iPhone, enable Developer Mode, and select it when prompted.
+In `ios/NextRep.xcworkspace`, select your own Development Team under Signing &
+Capabilities if signing fails. The default bundle ID is `com.nextrep.hackrice`;
+change app.json if your team needs a unique ID. No team, certificate, provisioning
+profile, Expo project, or credentials have been configured by this task.
+
+Unsigned compile check (does not install on a phone):
+
+```sh
+xcodebuild -workspace ios/NextRep.xcworkspace -scheme NextRep \
+  -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS' \
+  -derivedDataPath /tmp/nextrep-derived CODE_SIGNING_ALLOWED=NO
+```
+
+### Android
+
+Install JDK 17 and Android Studio with Android SDK Platform 36, Build Tools 36.0.0,
+platform-tools, NDK 27.1.12297006 and CMake. Set JAVA_HOME to your JDK and
+ANDROID_HOME to your SDK (macOS default below). Minimum phone OS is API 24.
+
+```sh
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+java -version
+adb devices
+npm run prebuild
+npm run android
+# Optional USB Metro connection:
+adb reverse tcp:8081 tcp:8081
+npm start
+```
+
+Enable USB debugging and accept the computer authorization on the phone. Linux
+and Windows developers should use their local JDK/SDK paths. Standalone native
+check: `cd android && ./gradlew :app:assembleDebug`.
+
+## Selected versions
+
+All direct versions are exact; package-lock.json locks the transitive npm graph.
+Expo's bundled dependency map and online `expo install --check` agree with this
+React/React Native selection.
+
+| Package | Version |
+| --- | --- |
+| Expo / development client | 54.0.37 / 6.0.21 |
+| React Native / React | 0.81.5 / 19.1.0 |
+| VisionCamera / Worklets Core | 4.7.3 / 1.6.2 |
+| react-native-mediapipe (candidate, not wired) | 0.6.0 |
+| AsyncStorage / safe-area-context | 2.2.0 / 5.6.0 |
+| TypeScript | 5.9.2 |
+| ESLint / Expo lint config | 9.39.1 / 10.0.0 |
+
+Legacy architecture is explicitly enabled via `newArchEnabled: false`. This keeps
+the candidate's legacy bridge path available. Native compatibility is provisional
+until both platforms compile and run on phones. See the inspected upstream source,
+licenses, SDK rationale, native dependency pins and known gaps in
+[native-integration.md](docs/native-integration.md). Expo development builds can
+host the native integration; there is no demonstrated need for bare RN.
+
+## Ownership and status
+
+| Owner | Files | Status |
+| --- | --- | --- |
+| Camera + native pose | src/features/tracking | Permission flow, preview, lifecycle and explicit missing adapter implemented; detector/model planned |
+| Squat algorithm | src/features/squat | Pure engine interface; features, temporal state machine and rubric planned |
+| Workout UI + audio | src/features/workout/WorkoutScreen.tsx, src/components | Home/setup/progression UI implemented; event feedback and audio planned |
+| Controller + storage | src/features/workout/controller.ts, src/features/progression | Attempt dedup reducer and local initial-player storage implemented; sets/rest/XP/upgrades planned |
+
+Shared contracts live in `src/contracts`; five-rep goal in `src/config`.
+Screens are intentionally simple local navigation with Android back handling.
+Tracking explicitly says **“Pose tracking not connected.”** No fake counts,
+ratings, rewards or development fixtures exist. Camera and storage behavior remain
+untested on physical devices. A bundle passing does not validate native code.
+
+See [workout ownership notes](src/features/workout/README.md) for end-of-attempt
+rating semantics, neutral tracking loss, controller-owned totals and persistent
+dedup requirements before enabling XP. Do not connect rewards directly to frames.
+
+## First real-phone test: camera → landmarks
+
+- [ ] Install the development build on one iPhone and one Android. Record OS,
+  model, build version and any native compile errors.
+- [ ] Verify allow/deny/Settings/re-entry, front/back preview, background/resume,
+  and navigation cleanup. Confirm the full body fits and no audio permission occurs.
+- [ ] Bundle a licensed official `.task` model in both native targets using a
+  repeatable config plugin; record its hash. Connect the candidate frame processor.
+- [ ] Fix Android timestamp forwarding, verify clock units/order, and map image
+  dimensions, orientation, mirroring and 33 landmarks into PoseFrame.
+- [ ] Add a labeled development landmark overlay; inspect shoulders, hips, knees
+  and ankles on both phones. Preserve provided visibility/presence; invent no scores.
+- [ ] Verify empty/occluded/multiple-person cases and detector failures produce
+  neutral guidance. Measure callback cadence and check stale results after resume.
+- [ ] Only then implement the TypeScript squat engine and connect attempt events
+  to controller/persistence, including duplicate-event and tracking-loss checks.
+
+## Validation
+
+Validation results and exact native blockers are recorded in
+[validation.md](docs/validation.md). Nothing was pushed or deployed.

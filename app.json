@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "NextRep",
+    "slug": "nextrep",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "ios": { "bundleIdentifier": "com.nextrep.hackrice", "supportsTablet": false },
+    "android": { "package": "com.nextrep.hackrice", "blockedPermissions": ["android.permission.RECORD_AUDIO"] },
+    "plugins": [
+      "expo-dev-client",
+      ["react-native-vision-camera", { "cameraPermissionText": "NextRep uses your camera for on-device workout tracking.", "enableMicrophonePermission": false }]
+    ]
+  }
+}
