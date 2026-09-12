@@ -1,6 +1,7 @@
 export interface SessionClock { countdownEndsAt: number; deadline: number; started: boolean; expired: boolean; remainingSeconds: number; }
-export function createSessionClock(now: number, matchTimeLimitSeconds: number, countdownSeconds = 10): SessionClock {
-  return { countdownEndsAt: now + countdownSeconds * 1000, deadline: now + (countdownSeconds + matchTimeLimitSeconds) * 1000, started: false, expired: false, remainingSeconds: matchTimeLimitSeconds };
+export function createSessionClock(now: number, matchTimeLimitSeconds: number, countdownSeconds = 10, sharedStartAt?: number): SessionClock {
+  const countdownEndsAt = (sharedStartAt ?? now) + countdownSeconds * 1000;
+  return { countdownEndsAt, deadline: countdownEndsAt + matchTimeLimitSeconds * 1000, started: now >= countdownEndsAt, expired: now >= countdownEndsAt + matchTimeLimitSeconds * 1000, remainingSeconds: Math.max(0, Math.ceil((countdownEndsAt + matchTimeLimitSeconds * 1000 - Math.max(now, countdownEndsAt)) / 1000)) };
 }
 export function advanceSessionClock(clock: SessionClock, now: number): SessionClock {
   if (!clock.started && now < clock.countdownEndsAt) return clock;

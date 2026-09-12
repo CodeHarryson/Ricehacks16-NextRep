@@ -112,7 +112,7 @@ host the native integration; there is no demonstrated need for bare RN.
 | Camera + native pose | src/features/tracking | VisionCamera + MediaPipe live-stream adapter, bundled Lite model, permission/lifecycle flow; physical devices pending |
 | Squat algorithm | src/features/squat | CV core implemented with pixel-space thigh inclination, calibration, smoothing, gating, temporal phases, ratings, replay fixtures and deterministic tests; real landmark/device calibration planned |
 | Workout UI + audio | src/features/workout/WorkoutScreen.tsx, src/components | Home/setup/progression UI implemented; event feedback and audio planned |
-| Controller + storage | src/features/workout/controller.ts, src/features/progression | Live five-rep set controller, idempotent local completion reward, and schema-v2 XP/OVR/coin persistence implemented; rest/upgrades planned |
+| Controller + storage | src/features/workout/controller.ts, src/features/progression | Live capped set controller, timed solo/challenge session boundary, idempotent local solo completion reward, and schema-v2 XP/OVR/coin persistence implemented; upgrades and challenge synchronization planned |
 
 Shared contracts live in `src/contracts`; five-rep and location thresholds live in
 `src/config`. The demo nearby map is available from the home screen.
