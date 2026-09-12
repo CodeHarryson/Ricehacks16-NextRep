@@ -16,6 +16,7 @@ import { DEFAULT_SOLO_SESSION, isValidWorkoutSession, type WorkoutSessionConfig 
 import { advanceSessionClock, canAcceptSessionAttempt, createSessionClock, type SessionClock } from './sessionClock';
 import { scoreAttempts, SCORE_POLICY_VERSION, type WorkoutScore } from './scoring';
 import { completedSetCountAfterCompletion } from './sessionAccounting';
+import { resultStatusAfter, type ResultStatus } from './finalization';
 
 function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): string {
   if (rejectedReason?.includes('visibility') || rejectedReason?.includes('framing') || rejectedReason?.includes('missing')) {
@@ -77,7 +78,6 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   const [resultError, setResultError] = useState<string | null>(null);
   const [opponentResult, setOpponentResult] = useState<ChallengeResult | null>(null);
   const [resolution, setResolution] = useState<ChallengeResolution>({ status: 'pending' });
-  type ResultStatus = 'not_started' | 'saving' | 'saved' | 'submission_pending' | 'submitted' | 'failed';
   const [resultStatus, setResultStatus] = useState<ResultStatus>('not_started');
   const finalizationInFlight = useRef(false);
   useEffect(() => {
@@ -122,19 +122,19 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   }, []);
   const finalizeSessionResult = useCallback(async (completedFully: boolean, completionEvent: SetCompleted | null) => {
     if (finalizationInFlight.current || resultStatus === 'submitted') return;
-    finalizationInFlight.current = true; setResultStatus('saving'); setResultError(null);
+    finalizationInFlight.current = true; setResultStatus((status) => resultStatusAfter(status, 'begin')); setResultError(null);
     const performanceId = `performance:${workout.current.sessionId}`;
     const startedAt = new Date(clock.current.countdownEndsAt).toISOString(); const endedAt = new Date(Math.min(Date.now(), clock.current.deadline)).toISOString();
     try {
       const score = scoreAttempts(sessionAttempts.current, sessionConfig.setCount * sessionConfig.targetReps); setChallengeResult(score);
       await saveWorkoutPerformance({ performanceId, workoutId: performanceId, mode: sessionConfig.mode, exercise: sessionConfig.exercise, setCount: sessionConfig.setCount, targetReps: sessionConfig.targetReps, matchDurationSeconds: sessionConfig.matchTimeLimitSeconds, startedAt, endedAt, ...score });
-      setResultStatus('saved');
+      setResultStatus((status) => resultStatusAfter(status, 'local_saved'));
       if (sessionConfig.mode === 'challenge' && sessionConfig.challengeId) {
-        setResultStatus('submission_pending'); const user = await loadDemoUser();
+        setResultStatus((status) => resultStatusAfter(status, 'submission_started')); const user = await loadDemoUser();
         await submitChallengeResult(user.userId, sessionConfig.challengeId, { configVersion: sessionConfig.configVersion ?? 1, exercise: sessionConfig.exercise, greenReps: score.greenReps, yellowReps: score.yellowReps, redAttempts: score.redAttempts, neutralAttempts: score.neutralAttempts, startedAt, endedAt, idempotencyKey: performanceId });
-        resultSubmitted.current = true; setResultStatus('submitted');
+        resultSubmitted.current = true; setResultStatus((status) => resultStatusAfter(status, 'submitted'));
       } else if (completedFully && completionEvent) await persistCompletion(completionEvent, sessionAttemptKeys.current);
-    } catch (caught) { setResultError(caught instanceof Error ? caught.message : 'Could not save workout result.'); setResultStatus('failed'); }
+    } catch (caught) { setResultError(caught instanceof Error ? caught.message : 'Could not save workout result.'); setResultStatus((status) => resultStatusAfter(status, 'failed')); }
     finally { finalizationInFlight.current = false; }
   }, [persistCompletion, resultStatus, sessionConfig.challengeId, sessionConfig.configVersion, sessionConfig.exercise, sessionConfig.matchTimeLimitSeconds, sessionConfig.mode, sessionConfig.setCount, sessionConfig.targetReps]);
   useEffect(() => { if (timeExpired && resultStatus === 'not_started') void finalizeSessionResult(false, null); }, [finalizeSessionResult, resultStatus, timeExpired]);
@@ -248,7 +248,7 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
       {resultError && <Card><Text style={styles.body}>Result save failed: {resultError}</Text><Action title="Retry result save" onPress={() => { void finalizeSessionResult(workoutState.status === 'complete', completion.current); }} /></Card>}
       <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
       <Text style={styles.body}>{workoutState.lastAttempt ? `Latest attempt: ${workoutState.lastAttempt.rating ?? 'neutral'} — ${workoutState.lastAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
-      {workoutState.status === 'complete' && <Text style={styles.heading} accessibilityLiveRegion="polite">Set complete{sessionConfig.mode === 'challenge' ? ' — challenge results are not synchronized yet.' : workoutState.rewardStatus === 'granted' ? ` — ${WORKOUT_COMPLETION_REWARD.xp} XP and +${WORKOUT_COMPLETION_REWARD.overallRatingDelta} OVR saved locally.` : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…'}</Text>}
+      {workoutState.status === 'complete' && <Text style={styles.heading} accessibilityLiveRegion="polite">Set complete{sessionConfig.mode === 'challenge' ? resultStatus === 'submitted' ? ' — challenge result submitted; awaiting opponent.' : ' — local score is being prepared.' : workoutState.rewardStatus === 'granted' ? ` — ${WORKOUT_COMPLETION_REWARD.xp} XP and +${WORKOUT_COMPLETION_REWARD.overallRatingDelta} OVR saved locally.` : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…'}</Text>}
       {workoutState.rewardStatus === 'failed' && <Action title="Retry reward save" onPress={retryReward} />}
     </Card>
   </View>;
