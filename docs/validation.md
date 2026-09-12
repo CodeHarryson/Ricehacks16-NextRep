@@ -11,6 +11,17 @@ No generator was run over the repository root. No push, deploy or signing change
 Node 24.18.0, npm 11.16.0, Xcode 26.6 (17F113), Swift 6.3.3, CocoaPods 1.17.0.
 Java runtime and adb were not available. No physical devices were tested.
 
+## Two-device presence test
+
+The development map includes local Test Player A/B coordinates so testing does
+not depend on the iOS Simulator Features → Location menu. Start the API with
+`npm run --prefix server start`, start the development client with `npm start`,
+and set the same reachable `EXPO_PUBLIC_API_URL` on both devices. Select Test
+Player A on one device and Test Player B on the other, keep both map screens
+open, and verify the diagnostics card reports a reachable API and recent
+publishes/polls. Presence expires after approximately one minute. Use “Use real
+device GPS” to return to normal foreground location behavior.
+
 ## Checks
 
 - `npm install`: succeeded with exact direct versions and package-lock.json.

@@ -147,9 +147,16 @@ identity or access control. Presence is foreground-only, expires after 60 second
 and is quantized before other users see it; use `npm run --prefix server cleanup`
 for scheduled expired-row cleanup.
 
-One-device API/map-path testing is complete. Two-device proximity testing remains
-planned for the next stage. The demo API accepts client-generated demo user IDs;
+One-device API/map-path testing is complete. For development-only two-device
+testing, keep both devices on the same bundle and `EXPO_PUBLIC_API_URL`, ensure
+both can reach the Mac running the API, choose Test Player A on one map and Test
+Player B on the other, and leave both map screens open. Presence expires after
+approximately one minute. The demo API accepts client-generated demo user IDs;
 these are not production authentication.
+
+For a physical phone, use the Mac’s LAN address instead of `localhost`, for
+example `EXPO_PUBLIC_API_URL=http://192.168.1.20:3000`, then restart Expo so both
+clients receive the same URL.
 
 The mobile test script uses Node's `--import tsx` loader instead of the `tsx`
 command-line wrapper. This avoids the wrapper's temporary IPC listener, which is
