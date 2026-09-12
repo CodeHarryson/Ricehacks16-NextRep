@@ -5,6 +5,7 @@ import { WORKOUT_TARGET_REPS } from '../../config/workout';
 import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { CameraPreview } from '../tracking/CameraPreview';
+import { assessFaceStart, FACE_START_HOLD_FRAMES } from '../tracking/faceStartGate';
 import { selectVisibleSide } from '../tracking/poseAdapter';
 import { DEFAULT_RUBRIC, SquatAnalyzer, type AnalyzerOutput, type SquatPhase } from '../squat/engine';
 
@@ -28,16 +29,35 @@ function guidanceForOutput(phase: SquatPhase, rejectedReason: string | null): st
 export function WorkoutScreen() {
   const analyzer = useRef<SquatAnalyzer | null>(null);
   const selectedSide = useRef<'left' | 'right' | null>(null);
+  const faceLockedRef = useRef(false);
+  const faceHoldFrames = useRef(0);
+  const [faceLocked, setFaceLocked] = useState(false);
+  const [faceProgress, setFaceProgress] = useState(0);
   const [tracking, setTracking] = useState<TrackingUpdate>({ status: 'initializing', observedAt: Date.now(), timestampUnit: 'milliseconds', clock: 'unix', guidance: 'Starting on-device pose tracking…' });
   const [phase, setPhase] = useState<SquatPhase>('CALIBRATING');
   const [reps, setReps] = useState(0);
   const [latestAttempt, setLatestAttempt] = useState<AttemptResult | null>(null);
-  const [analysisGuidance, setAnalysisGuidance] = useState('Step back until your full body is visible, then turn sideways.');
+  const [analysisGuidance, setAnalysisGuidance] = useState('Center your face in the oval to start.');
   const [analysisNeutral, setAnalysisNeutral] = useState(true);
   const [measurement, setMeasurement] = useState<AnalyzerOutput['feature']>(null);
   const [trackingDetail, setTrackingDetail] = useState('Waiting for accepted landmarks.');
   const interrupted = useRef(false);
   const onFrame = useCallback((frame: PoseFrame) => {
+    if (!faceLockedRef.current) {
+      const face = assessFaceStart(frame);
+      faceHoldFrames.current = face.ready ? faceHoldFrames.current + 1 : 0;
+      setFaceProgress(Math.min(faceHoldFrames.current, FACE_START_HOLD_FRAMES));
+      setAnalysisGuidance(face.guidance);
+      setTrackingDetail(face.ready ? 'Face placement accepted; hold still.' : 'Waiting for face placement.');
+      setAnalysisNeutral(true);
+      if (faceHoldFrames.current >= FACE_START_HOLD_FRAMES) {
+        faceLockedRef.current = true;
+        setFaceLocked(true);
+        setAnalysisGuidance('Start confirmed. Step back until your full body is visible, then turn sideways.');
+        setTrackingDetail('Session activated; waiting for full-body landmarks.');
+      }
+      return;
+    }
     if (selectedSide.current === null) {
       selectedSide.current = selectVisibleSide(frame);
       if (selectedSide.current === null) {
@@ -61,6 +81,10 @@ export function WorkoutScreen() {
   }, []);
   const onTracking = useCallback((update: TrackingUpdate) => {
     setTracking(update);
+    if (!faceLockedRef.current && update.status !== 'tracking') {
+      faceHoldFrames.current = 0;
+      setFaceProgress(0);
+    }
     if ((update.status === 'lost' || update.status === 'error') && !interrupted.current) {
       const attempt = analyzer.current?.updateTracking(null, update.monotonicTimestamp).at(-1); if (attempt) setLatestAttempt(attempt);
       if (analyzer.current) setPhase(analyzer.current.snapshot.phase);
@@ -72,10 +96,11 @@ export function WorkoutScreen() {
   return <View style={{ gap: 20 }}>
     <Text style={styles.eyebrow}>SETUP / BODYWEIGHT SQUATS</Text>
     <Text style={styles.title}>Find your space.</Text>
-    <Text style={styles.body}>Prop your phone securely. Step back until your full body and feet fit in view. Turn sideways and use a well-lit, clear space.</Text>
-    <CameraPreview onFrame={onFrame} onTracking={onTracking} />
+    <Text style={styles.body}>{faceLocked ? 'Step back until your full body and feet fit in view, then turn sideways.' : 'First, center your face in the camera oval and hold still to activate this workout.'}</Text>
+    <CameraPreview faceStartActive={!faceLocked} onFrame={onFrame} onTracking={onTracking} />
     <Card>
       <Text accessibilityLiveRegion="polite" style={styles.heading}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
+      <Text style={styles.body}>Face start: {faceLocked ? 'confirmed' : `${faceProgress}/${FACE_START_HOLD_FRAMES}`}</Text>
       <Text style={styles.body}>Visible side: {selectedSide.current ?? 'not selected yet'}</Text>
       <Text style={styles.body}>Phase: {phase}</Text>
       <Text style={styles.body}>Movement range: {measurement ? `${measurement.rangeFromStandingDeg.toFixed(1)}°` : '—'} (minimum {DEFAULT_RUBRIC.minimumRangeDeg}°)</Text>

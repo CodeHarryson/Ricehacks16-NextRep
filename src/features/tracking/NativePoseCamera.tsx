@@ -7,10 +7,11 @@ import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { useNativePoseAdapter } from './nativePoseAdapter';
 import { PoseOverlay } from './PoseOverlay';
 
-export function NativePoseCamera({ device, active, position, onFrame, onTracking, onInitialized, onError }: {
+export function NativePoseCamera({ device, active, position, faceStartActive, onFrame, onTracking, onInitialized, onError }: {
   device: CameraDevice;
   active: boolean;
   position: 'front' | 'back';
+  faceStartActive: boolean;
   onFrame: (frame: PoseFrame) => void;
   onTracking: (update: TrackingUpdate) => void;
   onInitialized: () => void;
@@ -60,7 +61,7 @@ export function NativePoseCamera({ device, active, position, onFrame, onTracking
     onInitialized={onInitialized}
     onError={(error) => onError(`Camera unavailable: ${error.code}`)}
     />
-    <PoseOverlay frame={overlayFrame} width={layout.width} height={layout.height} mirrored={false} />
+    <PoseOverlay frame={overlayFrame} width={layout.width} height={layout.height} mirrored={false} visible={faceStartActive} />
   </View>;
 }
 

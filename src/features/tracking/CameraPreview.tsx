@@ -5,7 +5,7 @@ import { Action, styles } from '../../components/ui';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { NativePoseCamera } from './NativePoseCamera';
 
-export function CameraPreview({ onFrame, onTracking }: { onFrame: (frame: PoseFrame) => void; onTracking: (update: TrackingUpdate) => void }) {
+export function CameraPreview({ faceStartActive, onFrame, onTracking }: { faceStartActive: boolean; onFrame: (frame: PoseFrame) => void; onTracking: (update: TrackingUpdate) => void }) {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [active, setActive] = useState(AppState.currentState === 'active');
   const [denied, setDenied] = useState(false);
@@ -36,7 +36,7 @@ export function CameraPreview({ onFrame, onTracking }: { onFrame: (frame: PoseFr
   </View>;
   return <View style={{ gap: 12 }}>
     <View style={cameraStyles.preview}>
-      {device ? <NativePoseCamera device={device} active={active} position={position} onFrame={onFrame} onTracking={onTracking} onInitialized={() => { setReady(true); setError(null); }} onError={(message) => { setReady(false); setError(message); }} /> :
+      {device ? <NativePoseCamera device={device} active={active} position={position} faceStartActive={faceStartActive} onFrame={onFrame} onTracking={onTracking} onInitialized={() => { setReady(true); setError(null); }} onError={(message) => { setReady(false); setError(message); }} /> :
         <Text style={styles.body}>No {position} camera available on this device.</Text>}
     </View>
     <Text style={styles.body}>{error ?? (!active ? 'Camera paused while app is inactive.' : ready ? 'Camera preview • on-device pose tracking' : 'Waiting for camera preview…')}</Text>

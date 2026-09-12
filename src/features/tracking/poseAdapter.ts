@@ -32,16 +32,28 @@ function rotateLandmark(landmark: NativeLandmark, turn: QuarterTurn): NativeLand
  */
 export function orientLandmarksUpright(landmarks: readonly NativeLandmark[]): NativeLandmark[] {
   const turns: readonly QuarterTurn[] = [0, 90, -90, 180];
+  const suppliedConfidence = (point: NativeLandmark | undefined) => point?.visibility ?? point?.presence ?? 0;
+  const bodyIndices = [11, 12, 27, 28] as const;
+  const bodyUsable = bodyIndices.every((index) => suppliedConfidence(landmarks[index]) >= 0.5);
   let bestTurn: QuarterTurn = 0;
   let bestScore = -Infinity;
   for (const turn of turns) {
     const rotated = landmarks.map((landmark) => rotateLandmark(landmark, turn));
-    const shoulders = [rotated[11], rotated[12]].filter((point): point is NativeLandmark => point !== undefined);
-    const ankles = [rotated[27], rotated[28]].filter((point): point is NativeLandmark => point !== undefined);
-    if (shoulders.length !== 2 || ankles.length !== 2) continue;
-    const shoulder = { x: (shoulders[0]!.x + shoulders[1]!.x) / 2, y: (shoulders[0]!.y + shoulders[1]!.y) / 2 };
-    const ankle = { x: (ankles[0]!.x + ankles[1]!.x) / 2, y: (ankles[0]!.y + ankles[1]!.y) / 2 };
-    const score = (ankle.y - shoulder.y) - Math.abs(ankle.x - shoulder.x);
+    let score = -Infinity;
+    if (bodyUsable) {
+      const leftShoulder = rotated[11]!; const rightShoulder = rotated[12]!;
+      const leftAnkle = rotated[27]!; const rightAnkle = rotated[28]!;
+      const shoulder = { x: (leftShoulder.x + rightShoulder.x) / 2, y: (leftShoulder.y + rightShoulder.y) / 2 };
+      const ankle = { x: (leftAnkle.x + rightAnkle.x) / 2, y: (leftAnkle.y + rightAnkle.y) / 2 };
+      score = (ankle.y - shoulder.y) - Math.abs(ankle.x - shoulder.x);
+    } else {
+      const nose = rotated[0]; const leftEye = rotated[2]; const rightEye = rotated[5];
+      const leftEar = rotated[7]; const rightEar = rotated[8];
+      if (nose && leftEye && rightEye && leftEar && rightEar) {
+        const eyeY = (leftEye.y + rightEye.y) / 2;
+        score = Math.abs(rightEar.x - leftEar.x) - Math.abs(rightEar.y - leftEar.y) + (nose.y - eyeY);
+      }
+    }
     if (score > bestScore) { bestScore = score; bestTurn = turn; }
   }
   return landmarks.map((landmark) => rotateLandmark(landmark, bestTurn));

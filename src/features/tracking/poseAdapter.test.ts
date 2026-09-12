@@ -54,3 +54,15 @@ test('sensor-landscape landmarks are rotated upright with shoulders above ankles
   assert.ok(upright[11]!.y < upright[27]!.y);
   assert.ok(Math.abs(upright[11]!.x - upright[27]!.x) < 0.1);
 });
+
+test('close-face orientation does not depend on off-screen ankles', () => {
+  const landmarks: NativeLandmark[] = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0 }));
+  landmarks[0] = { x: 0.36, y: 0.5, z: 0, visibility: 1 };
+  landmarks[2] = { x: 0.3, y: 0.46, z: 0, visibility: 1 };
+  landmarks[5] = { x: 0.3, y: 0.54, z: 0, visibility: 1 };
+  landmarks[7] = { x: 0.32, y: 0.4, z: 0, visibility: 1 };
+  landmarks[8] = { x: 0.32, y: 0.6, z: 0, visibility: 1 };
+  const upright = orientLandmarksUpright(landmarks);
+  assert.ok(Math.abs(upright[7]!.y - upright[8]!.y) < 0.05);
+  assert.ok(upright[0]!.y > (upright[2]!.y + upright[5]!.y) / 2);
+});

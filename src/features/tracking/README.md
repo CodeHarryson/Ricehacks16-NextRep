@@ -54,6 +54,19 @@ The installed bridge's front-camera landmark coordinates already align with the
 mirrored VisionCamera preview after upright normalization, so the overlay does not
 apply a second horizontal flip.
 
+## Face start gate
+
+Before squat setup, the workout uses the Pose Landmarker nose, eye, and ear points
+to check that a face is visible, centered, and large enough for eight consecutive
+frames. A face oval and those five points are the only overlay shown. After the gate
+succeeds, the overlay is removed and the normal full-body side selection and standing
+calibration begin. When ankles are off-screen during this close-face step, upright
+orientation uses the visible eye/ear line and nose position.
+
+This is a local start gesture, not facial recognition or identity tracking. It does
+not create a face embedding, identify a person, or prevent another person from
+entering the frame after activation.
+
 ## Comparison reference
 
 The Android comparison app at
