@@ -6,7 +6,9 @@ import { pool, type DbClient } from './db.js';
 import { quantizeCoordinate, validatePresence, type PresenceInput } from './validation.js';
 
 type PresenceRow = { user_id: string; display_name: string; latitude: number; longitude: number; captured_at: Date | string; distance_meters: number };
-type ChallengeRow = { challenge_id: string; sender_id: string; receiver_id: string; sender_display_name: string; receiver_display_name: string; status: string; created_at: Date | string; expires_at: Date | string; accepted_at: Date | string | null; proximity_meters: number };
+type ChallengeRow = { challenge_id: string; sender_id: string; receiver_id: string; sender_display_name: string; receiver_display_name: string; status: string; created_at: Date | string; expires_at: Date | string; accepted_at: Date | string | null; proximity_meters: number; exercise: string; set_count: number; target_reps: number; rest_seconds: number; match_time_limit_seconds: number; config_version: number; sender_accepted_at: Date | string | null; receiver_accepted_at: Date | string | null; started_at: Date | string | null };
+type ChallengeConfigInput = { exercise: string; setCount: number; targetReps: number; restSeconds: number; matchTimeLimitSeconds: number };
+const configResponse = (row: ChallengeRow) => ({ exercise: row.exercise ?? 'bodyweight_squat', setCount: row.set_count ?? 1, targetReps: row.target_reps ?? 5, restSeconds: row.rest_seconds ?? 30, matchTimeLimitSeconds: row.match_time_limit_seconds ?? 300, configVersion: row.config_version ?? 1 });
 const challengeResponse = (row: ChallengeRow) => ({
   challengeId: row.challenge_id,
   senderId: row.sender_id,
@@ -18,7 +20,24 @@ const challengeResponse = (row: ChallengeRow) => ({
   expiresAt: new Date(row.expires_at).toISOString(),
   acceptedAt: row.accepted_at ? new Date(row.accepted_at).toISOString() : null,
   proximityMeters: Math.round(Number(row.proximity_meters)),
+  configuration: configResponse(row),
+  acceptance: { senderAcceptedAt: row.sender_accepted_at ? new Date(row.sender_accepted_at).toISOString() : null, receiverAcceptedAt: row.receiver_accepted_at ? new Date(row.receiver_accepted_at).toISOString() : null },
+  locked: row.status === 'ready' || row.status === 'active',
+  startedAt: row.started_at ? new Date(row.started_at).toISOString() : null,
 });
+const parseConfig = (body: unknown): ChallengeConfigInput | string => {
+  if (!body || typeof body !== 'object') return 'invalid configuration';
+  const raw = body as Record<string, unknown>;
+  const values = { exercise: raw.exercise, setCount: raw.setCount, targetReps: raw.targetReps, restSeconds: raw.restSeconds, matchTimeLimitSeconds: raw.matchTimeLimitSeconds };
+  if (values.exercise !== 'bodyweight_squat') return 'only bodyweight_squat is supported';
+  if (![values.setCount, values.targetReps, values.restSeconds, values.matchTimeLimitSeconds].every((value) => typeof value === 'number' && Number.isInteger(value))) return 'configuration values must be integers';
+  const config = values as ChallengeConfigInput;
+  if (config.setCount < 1 || config.setCount > 3) return 'setCount must be between 1 and 3';
+  if (config.targetReps < 1 || config.targetReps > 50) return 'targetReps must be between 1 and 50';
+  if (config.restSeconds < 0 || config.restSeconds > 300) return 'restSeconds must be between 0 and 300';
+  if (config.matchTimeLimitSeconds < 30 || config.matchTimeLimitSeconds > 1800) return 'matchTimeLimitSeconds must be between 30 and 1800';
+  return config;
+};
 export function createApp(db: DbClient = pool): Hono {
   const app = new Hono();
   app.use('*', cors({ origin: CORS_ORIGIN }));
@@ -117,6 +136,63 @@ export function createApp(db: DbClient = pool): Hono {
     const result = await db.query<ChallengeRow>(
       `SELECT * FROM challenges WHERE (sender_id = $1 OR receiver_id = $1) ORDER BY created_at DESC`, [userId]);
     return context.json({ challenges: result.rows.map(challengeResponse) });
+  });
+  app.get('/challenges/:id', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    await db.query(`UPDATE challenges SET status = 'expired' WHERE challenge_id = $1 AND status IN ('pending', 'accepted', 'configuring') AND expires_at <= NOW()`, [context.req.param('id')]);
+    const result = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), userId]);
+    const challenge = result.rows[0];
+    if (!challenge) return context.json({ error: 'challenge not found' }, 404);
+    return context.json({ challenge: challengeResponse(challenge) });
+  });
+  app.patch('/challenges/:id/config', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    let body: unknown;
+    try { body = await context.req.json(); } catch { return context.json({ error: 'invalid JSON' }, 400); }
+    const parsed = parseConfig(body);
+    if (typeof parsed === 'string') return context.json({ error: parsed }, 400);
+    const result = await db.query<ChallengeRow>(
+      `UPDATE challenges SET exercise = $3, set_count = $4, target_reps = $5, rest_seconds = $6,
+         match_time_limit_seconds = $7, config_version = config_version + 1,
+         sender_accepted_at = NULL, receiver_accepted_at = NULL,
+         status = 'configuring'
+       WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)
+         AND status IN ('accepted', 'configuring') AND expires_at > NOW() RETURNING *`,
+      [context.req.param('id'), userId, parsed.exercise, parsed.setCount, parsed.targetReps, parsed.restSeconds, parsed.matchTimeLimitSeconds]);
+    const updated = result.rows[0];
+    if (!updated) return context.json({ error: 'challenge is locked or unavailable' }, 409);
+    return context.json({ challenge: challengeResponse(updated) });
+  });
+  app.post('/challenges/:id/accept-config', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    const result = await db.query<ChallengeRow>(
+      `UPDATE challenges SET
+         sender_accepted_at = CASE WHEN sender_id = $2 THEN COALESCE(sender_accepted_at, NOW()) ELSE sender_accepted_at END,
+         receiver_accepted_at = CASE WHEN receiver_id = $2 THEN COALESCE(receiver_accepted_at, NOW()) ELSE receiver_accepted_at END,
+         status = CASE WHEN (sender_id = $2 AND receiver_accepted_at IS NOT NULL) OR (receiver_id = $2 AND sender_accepted_at IS NOT NULL) THEN 'ready' ELSE 'configuring' END
+       WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)
+         AND status IN ('accepted', 'configuring') AND expires_at > NOW() RETURNING *`, [context.req.param('id'), userId]);
+    const accepted = result.rows[0];
+    if (accepted) return context.json({ challenge: challengeResponse(accepted) });
+    const existing = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), userId]);
+    if (existing.rows[0]?.status === 'ready') return context.json({ challenge: challengeResponse(existing.rows[0]) });
+    return context.json({ error: 'challenge is unavailable for configuration acceptance' }, 409);
+  });
+  app.post('/challenges/:id/start', async (context) => {
+    const userId = context.req.header('x-user-id');
+    if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
+    const result = await db.query<ChallengeRow>(
+      `UPDATE challenges SET status = 'active', started_at = COALESCE(started_at, NOW())
+       WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2) AND status = 'ready'
+         AND sender_accepted_at IS NOT NULL AND receiver_accepted_at IS NOT NULL AND expires_at > NOW() RETURNING *`, [context.req.param('id'), userId]);
+    const started = result.rows[0];
+    if (started) return context.json({ challenge: challengeResponse(started) });
+    const existing = await db.query<ChallengeRow>('SELECT * FROM challenges WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2)', [context.req.param('id'), userId]);
+    if (existing.rows[0]?.status === 'active') return context.json({ challenge: challengeResponse(existing.rows[0]) });
+    return context.json({ error: 'challenge is not ready to start' }, 409);
   });
   app.post('/challenges/:id/accept', async (context) => {
     const userId = context.req.header('x-user-id');

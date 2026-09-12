@@ -25,7 +25,8 @@ test('nearby response returns quantized server distances and excludes self in th
   assert.match(queryText, /ST_DWithin/);
 });
 
-const challengeRow = (overrides: Partial<Record<string, unknown>> = {}) => ({
+type ChallengeFixture = { challenge_id: string; sender_id: string; receiver_id: string; sender_display_name: string; receiver_display_name: string; status: string; created_at: Date; expires_at: Date; accepted_at: Date | null; proximity_meters: number; exercise?: string; set_count?: number; target_reps?: number; rest_seconds?: number; match_time_limit_seconds?: number; config_version?: number; sender_accepted_at?: Date | null; receiver_accepted_at?: Date | null; started_at?: Date | null };
+const challengeRow = (overrides: Partial<ChallengeFixture> = {}): ChallengeFixture => ({
   challenge_id: 'c1', sender_id: 'sender', receiver_id: 'receiver', sender_display_name: 'Sender', receiver_display_name: 'Receiver', status: 'pending',
   created_at: new Date('2026-09-12T12:00:00Z'), expires_at: new Date('2026-09-12T12:02:00Z'), accepted_at: null, proximity_meters: 42, ...overrides,
 });
@@ -82,4 +83,34 @@ test('challenge creation, listing, receiver-only responses, expiry, and retries 
   mode = 'expired';
   const expired = await app.request('http://local/challenges/c1/accept', { method: 'POST', headers: { 'x-user-id': 'receiver' } });
   assert.equal(expired.status, 409);
+});
+
+test('shared configuration validates, resets acceptance, reaches ready, and starts idempotently', async () => {
+  const row = challengeRow({ status: 'accepted', exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, rest_seconds: 30, match_time_limit_seconds: 300, config_version: 1, sender_accepted_at: null, receiver_accepted_at: null, started_at: null });
+  let current = { ...row };
+  const db = { query: async <T>(sql: string) => {
+    if (sql.includes('UPDATE challenges SET exercise')) { current = { ...current, status: 'configuring', set_count: 2, config_version: Number(current.config_version) + 1, sender_accepted_at: null, receiver_accepted_at: null }; return { rows: [current as T], rowCount: 1 }; }
+    if (sql.includes('UPDATE challenges SET') && sql.includes('sender_accepted_at = CASE')) { const caller = 'sender'; current = { ...current, sender_accepted_at: new Date() }; if (caller === current.receiver_id || current.receiver_accepted_at) current.status = 'ready'; return { rows: [current as T], rowCount: 1 }; }
+    if (sql.includes('UPDATE challenges SET') && sql.includes("status = 'active'")) { current = { ...current, status: 'active', started_at: new Date() }; return { rows: [current as T], rowCount: 1 }; }
+    if (sql.startsWith('UPDATE challenges SET status = \'expired\'')) return { rows: [], rowCount: 0 };
+    if (sql.startsWith('SELECT * FROM challenges')) return { rows: [current as T], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  } };
+  const app = createApp(db);
+  const base = 'http://local/challenges/c1';
+  const get = await app.request(base, { headers: { 'x-user-id': 'sender' } });
+  assert.equal((await get.json()).challenge.configuration.targetReps, 5);
+  const invalid = await app.request(`${base}/config`, { method: 'PATCH', headers: { 'x-user-id': 'sender', 'content-type': 'application/json' }, body: JSON.stringify({ exercise: 'pushup', setCount: 1, targetReps: 5, restSeconds: 30, matchTimeLimitSeconds: 300 }) });
+  assert.equal(invalid.status, 400);
+  const updated = await app.request(`${base}/config`, { method: 'PATCH', headers: { 'x-user-id': 'sender', 'content-type': 'application/json' }, body: JSON.stringify({ exercise: 'bodyweight_squat', setCount: 2, targetReps: 5, restSeconds: 30, matchTimeLimitSeconds: 300 }) });
+  assert.equal((await updated.json()).challenge.configuration.configVersion, 2);
+  const senderAccept = await app.request(`${base}/accept-config`, { method: 'POST', headers: { 'x-user-id': 'sender' } });
+  assert.equal((await senderAccept.json()).challenge.status, 'configuring');
+  current = { ...current, receiver_accepted_at: new Date() };
+  const receiverAccept = await app.request(`${base}/accept-config`, { method: 'POST', headers: { 'x-user-id': 'receiver' } });
+  assert.equal((await receiverAccept.json()).challenge.status, 'ready');
+  const started = await app.request(`${base}/start`, { method: 'POST', headers: { 'x-user-id': 'sender' } });
+  assert.equal((await started.json()).challenge.status, 'active');
+  const startRetry = await app.request(`${base}/start`, { method: 'POST', headers: { 'x-user-id': 'sender' } });
+  assert.equal(startRetry.status, 200);
 });

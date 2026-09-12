@@ -1,7 +1,8 @@
 import type { NearbyUser } from '../location/api';
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-export type ChallengeStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+export type ChallengeStatus = 'pending' | 'accepted' | 'configuring' | 'ready' | 'active' | 'declined' | 'expired' | 'cancelled';
+export interface ChallengeConfig { exercise: 'bodyweight_squat'; setCount: number; targetReps: number; restSeconds: number; matchTimeLimitSeconds: number; configVersion: number; }
 export interface Challenge {
   challengeId: string;
   senderId: string;
@@ -13,6 +14,10 @@ export interface Challenge {
   expiresAt: string;
   acceptedAt: string | null;
   proximityMeters: number;
+  configuration: ChallengeConfig;
+  acceptance: { senderAcceptedAt: string | null; receiverAcceptedAt: string | null };
+  locked: boolean;
+  startedAt: string | null;
 }
 
 async function request(path: string, init: RequestInit): Promise<Response> {
@@ -41,4 +46,16 @@ export async function acceptChallenge(userId: string, challengeId: string): Prom
 }
 export async function declineChallenge(userId: string, challengeId: string): Promise<Challenge> {
   return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/decline`, { method: 'POST', headers: { 'x-user-id': userId } })).json());
+}
+export async function getChallenge(userId: string, challengeId: string): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}`, { method: 'GET', headers: { 'x-user-id': userId } })).json());
+}
+export async function updateChallengeConfig(userId: string, challengeId: string, config: Omit<ChallengeConfig, 'configVersion'>): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/config`, { method: 'PATCH', headers: { 'x-user-id': userId }, body: JSON.stringify(config) })).json());
+}
+export async function acceptChallengeConfig(userId: string, challengeId: string): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/accept-config`, { method: 'POST', headers: { 'x-user-id': userId } })).json());
+}
+export async function startChallenge(userId: string, challengeId: string): Promise<Challenge> {
+  return parseChallenge(await (await request(`/challenges/${encodeURIComponent(challengeId)}/start`, { method: 'POST', headers: { 'x-user-id': userId } })).json());
 }
