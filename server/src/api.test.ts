@@ -280,3 +280,21 @@ test('a re-entered workout cannot duplicate or overwrite a submitted result', as
   assert.equal(results.length, 1);
   assert.equal(queries.filter((sql) => sql.includes('INSERT INTO challenge_participant_results')).length, 1);
 });
+
+test('an accepted, configuring, ready, or active challenge blocks a duplicate challenge between the same players', async () => {
+  const queries: string[] = [];
+  let inserted = false;
+  const app = createApp({ query: async <T>(sql: string) => {
+    queries.push(sql);
+    if (sql.includes('presence_events')) return { rows: [{ receiver_display_name: 'R', proximity_meters: 20 } as T], rowCount: 1 };
+    if (sql.includes('SELECT challenge_id FROM challenges')) return { rows: [{ challenge_id: 'already-active' } as T], rowCount: 1 };
+    if (sql.includes('INSERT INTO challenges')) inserted = true;
+    return { rows: [], rowCount: 0 };
+  } });
+  const response = await app.request('http://local/challenges', { method: 'POST', headers: { 'x-user-id': 's', 'x-display-name': 'S' }, body: JSON.stringify({ receiverId: 'r' }) });
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /open challenge already exists/);
+  assert.equal(inserted, false);
+  const duplicateQuery = queries.find((sql) => sql.includes('SELECT challenge_id FROM challenges')) ?? '';
+  for (const status of ['pending', 'accepted', 'configuring', 'ready', 'active']) assert.match(duplicateQuery, new RegExp(`'${status}'`));
+});

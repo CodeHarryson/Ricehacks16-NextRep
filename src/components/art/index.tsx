@@ -19,6 +19,9 @@ const images = {
   navMap: require('./images/nav-map.png'),
   navProfile: require('./images/nav-profile.png'),
   navDumbbell: require('./images/nav-dumbbell.png'),
+  navProgress: require('./images/nav-progress.png'),
+  navTrophy: require('./images/nav-trophy.png'),
+  navBell: require('./images/nav-bell.png'),
 } as const;
 
 export type AvatarVariant = 'self' | 'opponent';
@@ -34,8 +37,8 @@ export function FlameArt({ size = 20 }: { size?: number }) {
   return <Image accessible={false} source={images.flame} style={{ width: size, height: size }} />;
 }
 
-export type NavIconName = 'home' | 'map' | 'profile' | 'dumbbell';
-const NAV_ICONS: Record<NavIconName, number> = { home: images.navHome, map: images.navMap, profile: images.navProfile, dumbbell: images.navDumbbell };
+export type NavIconName = 'home' | 'map' | 'profile' | 'dumbbell' | 'progress' | 'trophy' | 'bell';
+const NAV_ICONS: Record<NavIconName, number> = { home: images.navHome, map: images.navMap, profile: images.navProfile, dumbbell: images.navDumbbell, progress: images.navProgress, trophy: images.navTrophy, bell: images.navBell };
 
 export function NavIconArt({ name, color, size = 26 }: { name: NavIconName; color: string; size?: number }) {
   return <Image accessible={false} source={NAV_ICONS[name]} style={{ width: size, height: size, tintColor: color }} />;

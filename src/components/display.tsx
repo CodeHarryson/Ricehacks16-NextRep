@@ -2,7 +2,7 @@ import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { AvatarArt, type AvatarVariant } from './art';
 import { styles } from './ui';
-import { borders, colors, quality, radii, spacing, tones, typography, type Tone } from '../theme/tokens';
+import { borders, colors, quality, radii, spacing, tones, typography, weight, type Tone } from '../theme/tokens';
 
 /** Rounded status label. Colour is paired with text so state never relies on colour alone. */
 export function Pill({ label, tone = 'neutral', solid = false, icon }: { label: string; tone?: Tone; solid?: boolean; icon?: ReactNode }) {
@@ -85,10 +85,20 @@ export function SetProgress({ setCount, currentSet, completedSets }: { setCount:
       const current = !done && index === Math.min(currentSet, setCount) - 1;
       return <View key={index} style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, backgroundColor: done ? colors.primary : current ? colors.accent : colors.canvas, borderColor: done ? colors.primary : current ? colors.accent : colors.border }}>
-          <Text style={[typography.caption, { fontWeight: '900', color: done || current ? colors.onColor : colors.textMuted }]}>{done ? '✓' : index + 1}</Text>
+          <Text style={[typography.caption, { ...weight('900'), color: done || current ? colors.onColor : colors.textMuted }]}>{done ? '✓' : index + 1}</Text>
         </View>
         {index < setCount - 1 && <View style={{ width: 20, height: 2, backgroundColor: done ? colors.primary : colors.border }} />}
       </View>;
     })}
+  </View>;
+}
+
+/** Honest placeholder for a feature with no backend yet: an icon, a title, and why nothing is shown. */
+export function EmptyState({ icon, title, body, children }: PropsWithChildren<{ icon: string; title: string; body: string }>) {
+  return <View accessible accessibilityLabel={`${title}. ${body}`} style={{ alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: borders.default, borderColor: colors.border, borderStyle: 'dashed', borderRadius: radii.md, padding: spacing.xl }}>
+    <Text style={{ fontSize: 34 }}>{icon}</Text>
+    <Text style={[typography.bodyLg, { color: colors.text, textAlign: 'center' }]}>{title}</Text>
+    <Text style={[styles.body, { textAlign: 'center' }]}>{body}</Text>
+    {children}
   </View>;
 }

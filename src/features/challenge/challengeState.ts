@@ -42,6 +42,9 @@ export function detectEndedChallenges(previous: readonly Challenge[], next: read
     if (!OPEN_STATUSES.includes(before.status) || !isParticipant(before, userId)) continue;
     const after = next.find((item) => item.challengeId === before.challengeId);
     const opponentName = opponentNameFor(before, userId);
+    // A started challenge leaves the list when its lobby window lapses; its result lives on the workout screen, so
+    // reporting it as "expired before it finished" would be misleading.
+    if (!after && before.status === 'active') continue;
     if (!after || after.status === 'expired') notices.push({ challengeId: before.challengeId, opponentName, reason: 'expired' });
     else if (after.status === 'cancelled') notices.push({ challengeId: before.challengeId, opponentName, reason: 'cancelled' });
     // The receiver chose to decline, so only the sender needs to be told.
@@ -52,4 +55,28 @@ export function detectEndedChallenges(previous: readonly Challenge[], next: read
 
 export function mergeNotices(current: readonly EndedChallengeNotice[], incoming: readonly EndedChallengeNotice[]): EndedChallengeNotice[] {
   return [...current, ...incoming.filter((notice) => !current.some((item) => item.challengeId === notice.challengeId))];
+}
+
+export const openChallengeBetween = (challenges: readonly Challenge[], userId: string, otherId: string): Challenge | undefined =>
+  challenges.find((item) => OPEN_STATUSES.includes(item.status) && isParticipant(item, userId) && isParticipant(item, otherId));
+
+export type SendBlockReason = 'loading' | 'busy' | 'open_challenge' | 'no_identity';
+export const SEND_BLOCK_COPY: Record<SendBlockReason, string> = {
+  loading: 'Checking existing challenges…',
+  busy: 'Sending…',
+  open_challenge: 'Challenge already open',
+  no_identity: 'Loading identity…',
+};
+
+/**
+ * Client-side duplicate guard: a challenge can be sent only after the first successful list load, while no
+ * request is in flight, and when no open challenge already exists with that player. The server enforces
+ * the same rule.
+ */
+export function challengeSendBlock(input: { userId: string | null; hasLoaded: boolean; busy: boolean; challenges: readonly Challenge[]; opponentId: string }): SendBlockReason | null {
+  if (!input.userId) return 'no_identity';
+  if (!input.hasLoaded) return 'loading';
+  if (openChallengeBetween(input.challenges, input.userId, input.opponentId)) return 'open_challenge';
+  if (input.busy) return 'busy';
+  return null;
 }

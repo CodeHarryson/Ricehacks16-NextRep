@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BattleRewardGate, type BattleRewardStatus } from './battleRewardGate';
 import { BATTLE_REWARD_POLICY_VERSION, BATTLE_REWARDS } from './rewards';
-import type { BattleReward } from '../progression/storage';
+import { grantBattleReward, loadPlayer, setPlayerStorageForTesting, type BattleReward } from '../progression/storage';
 
 const resolvedWin = { status: 'resolved' as const, winnerId: 'me', winningScore: 330 };
 
@@ -38,4 +38,17 @@ test('a failed save waits for a manual retry instead of retrying on every poll',
   assert.equal(attempts, 1);
   assert.equal(await gate.request('c1', 'me', { status: 'resolved', winnerId: 'them', winningScore: 330 }, { manual: true }), 'saved');
   assert.equal(attempts, 2);
+});
+
+test('re-entering a resolved challenge creates a new gate but storage still grants the reward once', async () => {
+  const memory = new Map<string, string>();
+  setPlayerStorageForTesting({ getItem: async (key) => memory.get(key) ?? null, setItem: async (key, value) => { memory.set(key, value); } });
+  const before = await loadPlayer();
+  const firstVisit = new BattleRewardGate(grantBattleReward);
+  assert.equal(await firstVisit.request('c-reentry', 'me', resolvedWin), 'saved');
+  const secondVisit = new BattleRewardGate(grantBattleReward);
+  assert.equal(await secondVisit.request('c-reentry', 'me', resolvedWin), 'saved');
+  const after = await loadPlayer();
+  assert.equal(after.coins - before.coins, BATTLE_REWARDS.winner.coins);
+  assert.equal(after.xp - before.xp, BATTLE_REWARDS.winner.xp);
 });

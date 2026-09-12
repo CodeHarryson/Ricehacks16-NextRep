@@ -1,6 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { borders, colors, elevation, layout, radii, spacing, tones, typography, type Tone } from '../theme/tokens';
+import { borders, colors, elevation, layout, radii, spacing, tones, typography, weight, type Tone } from '../theme/tokens';
 
 export type ActionVariant = 'primary' | 'secondary' | 'accent' | 'danger' | 'ghost';
 const ACTION_PALETTE: Record<ActionVariant, { bg: string; edge: string; text: string; shadow: string | null }> = {
@@ -84,19 +84,24 @@ export function ScreenHeader({ eyebrow, title, subtitle, trailing }: { eyebrow?:
   </View>;
 }
 
-export const styles = StyleSheet.create({
+const layoutStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: layout.gutter, gap: spacing.lg, paddingBottom: spacing.xxxl, width: '100%', maxWidth: layout.maxContentWidth, alignSelf: 'center' },
-  eyebrow: { ...typography.label, color: colors.textMuted, letterSpacing: 1.2 },
-  title: { ...typography.title, color: colors.text },
-  heading: { ...typography.section, color: colors.text },
-  body: { ...typography.body, color: colors.textSecondary },
-  label: { ...typography.label, color: colors.textMuted },
-  caption: { ...typography.caption, color: colors.textMuted },
   card: { backgroundColor: colors.surface, borderRadius: radii.md, borderWidth: borders.default, borderColor: colors.border, padding: spacing.lg, gap: spacing.md },
   button: { borderRadius: radii.md, alignItems: 'center', justifyContent: 'center', borderWidth: 0 },
   buttonDisabled: { backgroundColor: colors.canvas, borderColor: colors.border, borderWidth: borders.default, borderBottomWidth: borders.default },
-  buttonText: { ...typography.bodyLg, fontWeight: '900', color: colors.onColor, textAlign: 'center' },
   iconButton: { width: 36, height: 36, borderRadius: radii.pill, backgroundColor: colors.surface, borderWidth: borders.default, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  iconButtonGlyph: { fontSize: 18, lineHeight: 20, fontWeight: '900', color: colors.textMuted },
 });
+
+/** Text styles are getters so they pick up the font resolved by FontGate rather than the import-time default. */
+export const styles = {
+  ...layoutStyles,
+  get eyebrow() { return { ...typography.label, color: colors.textMuted, letterSpacing: 1.2 }; },
+  get title() { return { ...typography.title, color: colors.text }; },
+  get heading() { return { ...typography.section, color: colors.text }; },
+  get body() { return { ...typography.body, color: colors.textSecondary }; },
+  get label() { return { ...typography.label, color: colors.textMuted }; },
+  get caption() { return { ...typography.caption, color: colors.textMuted }; },
+  get buttonText() { return { ...typography.bodyLg, ...weight('900'), color: colors.onColor, textAlign: 'center' as const }; },
+  get iconButtonGlyph() { return { fontSize: 18, lineHeight: 20, ...weight('900'), color: colors.textMuted }; },
+};

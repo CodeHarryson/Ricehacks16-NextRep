@@ -2,7 +2,7 @@ import type { PropsWithChildren } from 'react';
 import { Text, View } from 'react-native';
 import { QualityBar, QualityLegend, SetProgress, StatRow, StatTile } from '../../../components/display';
 import { Card, styles } from '../../../components/ui';
-import { borders, colors, radii, spacing, tones, typography, type Tone } from '../../../theme/tokens';
+import { borders, colors, radii, spacing, tones, typography, weight, type Tone } from '../../../theme/tokens';
 import type { WorkoutScore } from '../scoring';
 import { attemptQualityVisual, timerColor, type AttemptRating } from './workoutVisuals';
 
@@ -32,7 +32,7 @@ export function RepCounter({ reps, targetReps, lastRating, lastReason }: { reps:
       {visual ? <>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: visual.color }} />
-          <Text style={[typography.bodyLg, { fontWeight: '900', color: visual.textColor }]}>{visual.label}</Text>
+          <Text style={[typography.bodyLg, { ...weight('900'), color: visual.textColor }]}>{visual.label}</Text>
           <Text style={[typography.caption, { color: colors.textMuted }]}>{visual.counted ? '· counted' : '· not counted'}</Text>
         </View>
         {lastReason && <Text numberOfLines={2} style={[typography.caption, { color: colors.textSecondary }]}>{lastReason}</Text>}
@@ -60,7 +60,7 @@ export function CameraFrame({ instruction, children }: PropsWithChildren<{ instr
 /** Score card for the local score (solo result, or challenge score before server submission). */
 export function ScoreSummaryCard({ title, score, note }: { title: string; score: WorkoutScore; note: string }) {
   return <Card variant="plain">
-    <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900', textAlign: 'center' }]}>{title}</Text>
+    <Text style={[typography.bodyLg, { color: colors.text, ...weight('900'), textAlign: 'center' }]}>{title}</Text>
     <StatRow>
       <StatTile value={score.totalScore} label="Points" color={colors.currencyText} />
       <StatTile value={`${score.countedReps}/${score.cappedTargetReps}`} label="Counted reps" />

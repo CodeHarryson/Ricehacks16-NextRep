@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { AvatarBadge, Pill } from '../../../components/display';
 import { Action } from '../../../components/ui';
-import { colors, radii, spacing, typography, type Tone } from '../../../theme/tokens';
+import { colors, radii, spacing, typography, weight, type Tone } from '../../../theme/tokens';
 
 /** Compact VS header for an agreed challenge (Figma S3 styling without the full-screen animation). */
 export function VsBanner({ selfName, opponentName, statusLabel, statusTone }: { selfName: string; opponentName: string; statusLabel: string; statusTone: Tone }) {
@@ -10,12 +10,12 @@ export function VsBanner({ selfName, opponentName, statusLabel, statusTone }: { 
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md }}>
       <View style={{ flex: 1, alignItems: 'center', gap: spacing.xs, backgroundColor: colors.accentBg, borderRadius: radii.sm, paddingVertical: spacing.sm }}>
         <AvatarBadge size={52} />
-        <Text numberOfLines={1} style={[typography.label, { color: colors.text, fontWeight: '900' }]}>{selfName}</Text>
+        <Text numberOfLines={1} style={[typography.label, { color: colors.text, ...weight('900') }]}>{selfName}</Text>
       </View>
-      <Text style={{ fontSize: 30, fontWeight: '900', color: colors.goldFill, marginHorizontal: spacing.md, textShadowColor: colors.streak, textShadowRadius: 1, textShadowOffset: { width: 1, height: 1 } }}>VS</Text>
+      <Text style={{ fontSize: 30, ...weight('900'), color: colors.goldFill, marginHorizontal: spacing.md, textShadowColor: colors.streak, textShadowRadius: 1, textShadowOffset: { width: 1, height: 1 } }}>VS</Text>
       <View style={{ flex: 1, alignItems: 'center', gap: spacing.xs, backgroundColor: colors.dangerBg, borderRadius: radii.sm, paddingVertical: spacing.sm }}>
         <AvatarBadge variant="opponent" size={52} />
-        <Text numberOfLines={1} style={[typography.label, { color: colors.text, fontWeight: '900' }]}>{opponentName}</Text>
+        <Text numberOfLines={1} style={[typography.label, { color: colors.text, ...weight('900') }]}>{opponentName}</Text>
       </View>
     </View>
     <View style={{ alignItems: 'center', paddingBottom: spacing.md }}><Pill label={statusLabel} tone={statusTone} /></View>
@@ -27,7 +27,7 @@ export function PlayerRow({ name, detail, trailing }: { name: string; detail?: s
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs }}>
     <AvatarBadge variant="opponent" size={40} />
     <View style={{ flex: 1 }}>
-      <Text numberOfLines={1} style={[typography.bodyLg, { color: colors.text, fontWeight: '900' }]}>{name}</Text>
+      <Text numberOfLines={1} style={[typography.bodyLg, { color: colors.text, ...weight('900') }]}>{name}</Text>
       {detail && <Text style={[typography.caption, { color: colors.textMuted }]}>{detail}</Text>}
     </View>
     {trailing}

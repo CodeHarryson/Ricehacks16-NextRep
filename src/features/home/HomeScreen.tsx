@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 import { AvatarArt } from '../../components/art';
 import { PlayerHud } from '../../components/PlayerHud';
 import { Action, Card, ScreenHeader, styles } from '../../components/ui';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { colors, spacing, typography, weight } from '../../theme/tokens';
 import { usePlayerSummary } from '../progression/usePlayerSummary';
 
 export function HomeScreen({ onStartWorkout, onOpenMap, onOpenProgression }: { onStartWorkout: () => void; onOpenMap: () => void; onOpenProgression: () => void }) {
@@ -13,7 +13,7 @@ export function HomeScreen({ onStartWorkout, onOpenMap, onOpenProgression }: { o
     <Card variant="selected" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
       <AvatarArt framing="full" size={96} />
       <View style={{ flex: 1, gap: spacing.xs }}>
-        <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900' }]}>Your next rep starts with you.</Text>
+        <Text style={[typography.bodyLg, { color: colors.text, ...weight('900') }]}>Your next rep starts with you.</Text>
         <Text style={styles.body}>Track a live squat set or challenge approximate nearby demo users.</Text>
       </View>
     </Card>

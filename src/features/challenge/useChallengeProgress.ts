@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CHALLENGE_POLL_INTERVAL_MS } from '../../config/workout';
 import { grantBattleReward } from '../progression/storage';
 import { loadDemoUser } from '../location/identity';
+import { diagnosticsStore } from '../diagnostics/diagnosticsStore';
 import { getChallengeResults, type ChallengeResult } from './api';
 import { BattleRewardGate, type BattleRewardStatus } from './battleRewardGate';
+import { connectionStatus, type ConnectionStatus } from './connectionStatus';
 import { opponentStatusFromResults, type OpponentStatus } from './opponentStatus';
+import { startForegroundPolling } from './pollingLifecycle';
 import { ChallengeResultPoller, INITIAL_RESULT_POLL_STATE, type ResultPollState } from './resultPolling';
 
 export interface ChallengeProgress {
   userId: string | null;
   identityError: string | null;
   poll: ResultPollState;
+  connection: ConnectionStatus;
   myResult: ChallengeResult | null;
   opponentResult: ChallengeResult | null;
   /** null until identity and the first result poll have loaded. */
@@ -21,8 +24,8 @@ export interface ChallengeProgress {
 }
 
 /**
- * Challenge-only data for the workout screen: result polling, opponent status, and the one-time battle
- * reward. Inert when disabled so solo workouts make no challenge requests.
+ * Challenge-only data for the workout screen: result polling (paused in the background, stopped once final),
+ * opponent status, and the one-time battle reward. Inert when disabled so solo workouts make no requests.
  */
 export function useChallengeProgress({ challengeId, enabled, localSubmitted }: { challengeId?: string; enabled: boolean; localSubmitted: boolean }): ChallengeProgress {
   const [userId, setUserId] = useState<string | null>(null);
@@ -44,11 +47,14 @@ export function useChallengeProgress({ challengeId, enabled, localSubmitted }: {
 
   useEffect(() => {
     if (!enabled || !challengeId || !userId) return;
-    const active = new ChallengeResultPoller(() => getChallengeResults(userId, challengeId), setPoll);
+    diagnosticsStore.update({ challengeId, userId });
+    const active = new ChallengeResultPoller(() => getChallengeResults(userId, challengeId), (state) => {
+      setPoll(state);
+      if (state.lastUpdatedAt !== null) diagnosticsStore.update({ lastResultSyncAt: state.lastUpdatedAt });
+    });
     poller.current = active;
-    void active.tick();
-    const timer = setInterval(() => { void active.tick(); }, CHALLENGE_POLL_INTERVAL_MS);
-    return () => { active.stop(); clearInterval(timer); poller.current = null; };
+    const stop = startForegroundPolling(active);
+    return () => { stop(); poller.current = null; };
   }, [challengeId, enabled, userId]);
 
   const resolution = poll.snapshot?.resolution;
@@ -66,6 +72,7 @@ export function useChallengeProgress({ challengeId, enabled, localSubmitted }: {
     userId,
     identityError,
     poll,
+    connection: connectionStatus(poll),
     myResult: userId ? results.find((item) => item.participantId === userId) ?? null : null,
     opponentResult: userId ? results.find((item) => item.participantId !== userId) ?? null : null,
     opponentStatus: userId && poll.snapshot ? opponentStatusFromResults({ userId, results: poll.snapshot.results, resolution: poll.snapshot.resolution, localSubmitted }) : null,

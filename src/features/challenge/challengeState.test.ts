@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildChallengeWorkoutSession, detectEndedChallenges, findActiveChallenge, mergeNotices, shouldAutoLaunchWorkout } from './challengeState';
+import { buildChallengeWorkoutSession, challengeSendBlock, detectEndedChallenges, openChallengeBetween, findActiveChallenge, mergeNotices, shouldAutoLaunchWorkout } from './challengeState';
 import { describeChallengeError } from './errors';
 import { challengeFixture } from './testFixtures';
 
@@ -37,4 +37,24 @@ test('network failures get readable retry copy; server errors keep their message
   assert.equal(describeChallengeError(new TypeError('Network request failed'), 'x').kind, 'network');
   assert.deepEqual(describeChallengeError(new Error('user is outside the challenge radius'), 'x'), { kind: 'server', message: 'user is outside the challenge radius' });
   assert.deepEqual(describeChallengeError('boom', 'Could not load challenges.'), { kind: 'server', message: 'Could not load challenges.' });
+});
+
+test('duplicate challenges are blocked until the list loads, while busy, and while any open challenge exists', () => {
+  const base = { userId: 'me', hasLoaded: true, busy: false, challenges: [] as ReturnType<typeof challengeFixture>[], opponentId: 'them' };
+  assert.equal(challengeSendBlock(base), null);
+  assert.equal(challengeSendBlock({ ...base, userId: null }), 'no_identity');
+  assert.equal(challengeSendBlock({ ...base, hasLoaded: false }), 'loading');
+  assert.equal(challengeSendBlock({ ...base, busy: true }), 'busy');
+  for (const status of ['pending', 'accepted', 'configuring', 'ready', 'active'] as const) {
+    assert.equal(challengeSendBlock({ ...base, challenges: [challengeFixture({ status })] }), 'open_challenge', status);
+  }
+  // Re-entry sees the receiver side too, and finished challenges do not block a rematch.
+  assert.ok(openChallengeBetween([challengeFixture({ senderId: 'them', receiverId: 'me' })], 'me', 'them'));
+  for (const status of ['declined', 'expired', 'cancelled'] as const) assert.equal(challengeSendBlock({ ...base, challenges: [challengeFixture({ status })] }), null, status);
+  // A challenge with a different player does not block this one.
+  assert.equal(challengeSendBlock({ ...base, challenges: [challengeFixture({ receiverId: 'someone-else' })] }), null);
+});
+
+test('a started challenge that leaves the list is not reported as expired', () => {
+  assert.deepEqual(detectEndedChallenges([challengeFixture({ status: 'active' })], [], 'me'), []);
 });

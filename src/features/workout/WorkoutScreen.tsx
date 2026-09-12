@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Action, Card, ScreenHeader, styles } from '../../components/ui';
 import { Banner, Collapsible } from '../../components/display';
-import { colors, typography, type Tone } from '../../theme/tokens';
+import { colors, typography, weight, type Tone } from '../../theme/tokens';
 import { SESSION_COUNTDOWN_SECONDS, WORKOUT_COMPLETION_REWARD } from '../../config/workout';
 import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
@@ -16,6 +16,9 @@ import { submitChallengeResult } from '../challenge/api';
 import { ChallengeResultPanel } from '../challenge/components/ChallengeResultPanel';
 import { OpponentStatusCard } from '../challenge/components/OpponentStatusCard';
 import { isFinalResolution } from '../challenge/resultPolling';
+import { challengeEntryState } from '../challenge/challengeEntry';
+import { ConnectionStatusBar } from '../../components/ConnectionStatusBar';
+import { DiagnosticsPanel } from '../diagnostics/DiagnosticsPanel';
 import { buildChallengeResultView } from '../challenge/resultView';
 import { useChallengeProgress } from '../challenge/useChallengeProgress';
 import { CountdownCard } from './components/CountdownCard';
@@ -97,6 +100,9 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
   const serverHasResult = isChallenge && challenge.myResult !== null;
   const serverHasResultRef = useRef(serverHasResult);
   useEffect(() => { serverHasResultRef.current = serverHasResult; }, [serverHasResult]);
+  // Re-entry: the camera only starts after the server confirms this player has not submitted; submitted and
+  // resolved challenges go straight to the result panel.
+  const entry = challengeEntryState({ isChallenge, userId: challenge.userId, identityError: challenge.identityError !== null, poll: challenge.poll, localSubmitted: resultStatus === 'submitted' });
   useEffect(() => {
     if (!validSession) return;
     const timer = setInterval(() => { const next = advanceSessionClock(clock.current, Date.now()); clock.current = next; setClockState(next); }, 250);
@@ -150,7 +156,7 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
     } catch (caught) { setResultError(caught instanceof Error ? caught.message : 'Could not save workout result.'); setResultStatus((status) => resultStatusAfter(status, 'failed')); }
     finally { finalizationInFlight.current = false; }
   }, [persistCompletion, resultStatus, sessionConfig.challengeId, sessionConfig.configVersion, sessionConfig.exercise, sessionConfig.matchTimeLimitSeconds, sessionConfig.mode, sessionConfig.setCount, sessionConfig.targetReps]);
-  useEffect(() => { if (timeExpired && resultStatus === 'not_started' && !serverHasResult) void finalizeSessionResult(false, null); }, [finalizeSessionResult, resultStatus, serverHasResult, timeExpired]);
+  useEffect(() => { if (timeExpired && resultStatus === 'not_started' && !serverHasResult && entry.phase === 'workout') void finalizeSessionResult(false, null); }, [entry.phase, finalizeSessionResult, resultStatus, serverHasResult, timeExpired]);
   const consumeAttempts = useCallback((attempts: readonly AttemptResult[]) => {
     for (const attempt of attempts) {
       if (resting || serverHasResultRef.current || !canAcceptSessionAttempt(clock.current, attempt.endedAt)) continue;
@@ -235,7 +241,7 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
   const view = workoutSessionView(sessionConfig);
   const countdown = countdownView(clockState, Date.now(), joinedAt.current, SESSION_COUNTDOWN_SECONDS);
   const snapshot = challenge.poll.snapshot;
-  const showResultPanel = isChallenge && (resultStatus === 'submitted' || serverHasResult || isFinalResolution(snapshot));
+  const showResultPanel = entry.showResultPanel;
   const resultView = showResultPanel ? buildChallengeResultView({ userId: challenge.userId, results: snapshot?.results ?? [], resolution: snapshot?.resolution ?? { status: 'pending' }, localScore: challengeResult, opponentName: view.opponentName ?? undefined }) : null;
   const sessionPhase = timeExpired ? 'expired' : workoutState.status === 'complete' || showResultPanel ? 'completed' : resting ? 'rest' : sessionStarted ? 'active' : 'countdown';
   const phaseVisual: Record<typeof sessionPhase, { label: string; tone: Tone }> = { countdown: { label: 'Countdown', tone: 'info' }, active: { label: 'Tracking reps', tone: 'success' }, rest: { label: 'Resting', tone: 'info' }, completed: { label: 'Complete', tone: 'success' }, expired: { label: 'Time expired', tone: 'danger' } };
@@ -243,15 +249,18 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
   return <View style={{ gap: 16 }}>
     <WorkoutHud setCount={sessionConfig.setCount} currentSet={currentSet} completedSets={completedSets} secondsRemaining={sessionPhase === 'active' ? countdown.secondsRemaining : null} phaseLabel={phaseVisual[sessionPhase].label} phaseTone={phaseVisual[sessionPhase].tone} />
     <ScreenHeader eyebrow={view.eyebrow} title="Find your space." />
+    {isChallenge && <ConnectionStatusBar status={challenge.connection} lastUpdatedAt={challenge.poll.lastUpdatedAt} onRetry={challenge.retryPolling} />}
     {challenge.identityError && <Banner tone="danger" title="Challenge unavailable" message={challenge.identityError} />}
     {resultView && <ChallengeResultPanel view={resultView} pollError={challenge.poll.error} rewardStatus={challenge.rewardStatus} onRetryPolling={challenge.retryPolling} onRetryReward={challenge.retryReward} onReturnToMap={onExit} />}
     {(sessionPhase === 'countdown' || (sessionPhase === 'active' && isChallenge && countdown.skippedCountdown) || (sessionPhase === 'expired' && !showResultPanel)) && <CountdownCard view={countdown} message={countdownMessage(countdown, isChallenge, view.opponentName ?? undefined)} />}
     {view.showOpponentStatus && !showResultPanel && <OpponentStatusCard opponentName={view.opponentName} status={challenge.opponentStatus} error={challenge.poll.error} onRetry={challenge.retryPolling} />}
     {sessionPhase === 'rest' && <RestTimerCard nextSet={currentSet} secondsLeft={restRemaining} />}
     {!showResultPanel && <SessionConfigCard view={view} />}
-    {sessionStarted && !timeExpired && !resting && !showResultPanel && <CameraFrame instruction={faceLocked ? 'Step back until your full body and feet fit in view, then turn sideways.' : 'First, center your face in the camera oval and hold still to activate this workout.'}><CameraPreview faceStartActive={!faceLocked} onFrame={onFrame} onTracking={onTracking} /></CameraFrame>}
+    {entry.phase === 'checking' && <Banner tone="info" title="Checking challenge status…" message="The camera starts once the server confirms you have not already submitted a result." live />}
+    {entry.unverified && !timeExpired && <Banner tone="warning" title="Could not confirm challenge status" message="The workout continues. If you already submitted a result, the server keeps your first one." />}
+    {sessionStarted && !timeExpired && !resting && entry.showCamera && !showResultPanel && <CameraFrame instruction={faceLocked ? 'Step back until your full body and feet fit in view, then turn sideways.' : 'First, center your face in the camera oval and hold still to activate this workout.'}><CameraPreview faceStartActive={!faceLocked} onFrame={onFrame} onTracking={onTracking} /></CameraFrame>}
     <Card>
-      <Text accessibilityLiveRegion="polite" style={[typography.bodyLg, { color: neutral ? colors.textSecondary : colors.text, fontWeight: '900' }]}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
+      <Text accessibilityLiveRegion="polite" style={[typography.bodyLg, { color: neutral ? colors.textSecondary : colors.text, ...weight('900') }]}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
       <RepCounter reps={workoutState.reps} targetReps={workoutState.targetReps} lastRating={workoutState.lastAttempt ? workoutState.lastAttempt.rating : undefined} lastReason={workoutState.lastAttempt?.reason ?? null} />
       {timeExpired && <Banner tone="warning" title="Time expired — reps counted before the deadline are preserved." live />}
       {resultStatus === 'saving' && <Banner tone="info" title="Calculating score…" live />}
@@ -273,5 +282,6 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
         <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
       </Collapsible>
     </Card>
+    <DiagnosticsPanel />
   </View>;
 }

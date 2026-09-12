@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 import { AvatarArt } from '../../../components/art';
 import { Pill, QualityBar, QualityLegend } from '../../../components/display';
 import { Action, Card, styles } from '../../../components/ui';
-import { borders, colors, radii, spacing, tones, typography } from '../../../theme/tokens';
+import { borders, colors, radii, spacing, tones, typography, weight } from '../../../theme/tokens';
 import type { BattleRewardStatus } from '../battleRewardGate';
 import type { ChallengeErrorInfo } from '../errors';
 import type { ChallengeResultView, ScoreBreakdown } from '../resultView';
@@ -19,7 +19,7 @@ function PlayerScore({ name, variant, score, highlight, badge, note, emptyText }
   return <View style={{ flex: 1, minWidth: 140, alignItems: 'center', gap: spacing.xs, backgroundColor: variant === 'self' ? colors.accentBg : colors.surface, borderRadius: radii.md, borderWidth: highlight ? borders.strong - 0.5 : borders.default, borderColor: highlight ? colors.accent : colors.border, padding: spacing.md }}>
     <AvatarArt variant={variant} framing="full" size={72} />
     {badge ? <Pill label={badge.label} tone={badge.tone} solid={badge.tone !== 'danger'} /> : null}
-    <Text numberOfLines={1} style={[typography.label, { color: colors.text, fontWeight: '900' }]}>{name}</Text>
+    <Text numberOfLines={1} style={[typography.label, { color: colors.text, ...weight('900') }]}>{name}</Text>
     {score ? <>
       <Text accessibilityLabel={`${score.totalScore} points`} style={[typography.number, { color: colors.currencyText }]}>{score.totalScore}<Text style={[typography.caption, { color: colors.currencyText }]}> pts</Text></Text>
       <Text style={[typography.caption, { color: colors.textSecondary }]}>{score.countedReps} counted reps</Text>
@@ -33,7 +33,7 @@ function PlayerScore({ name, variant, score, highlight, badge, note, emptyText }
 function RewardRow({ label, value, color }: { label: string; value: string; color: string }) {
   return <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
     <Text style={[typography.label, { color: colors.textMuted }]}>{label}</Text>
-    <Text style={[typography.bodyLg, { fontWeight: '900', color }]}>{value}</Text>
+    <Text style={[typography.bodyLg, { ...weight('900'), color }]}>{value}</Text>
   </View>;
 }
 

@@ -5,10 +5,12 @@ import { Camera, CircleLayer, MapView, MarkerView, ShapeSource, type CameraRef }
 import { Action, Card, ScreenHeader, styles } from '../../components/ui';
 import { AvatarBadge, Banner, Collapsible, Pill } from '../../components/display';
 import { PlayerHud } from '../../components/PlayerHud';
-import { borders, colors, elevation, radii, spacing, typography } from '../../theme/tokens';
+import { borders, colors, elevation, radii, spacing, typography, weight } from '../../theme/tokens';
 import { usePlayerSummary } from '../progression/usePlayerSummary';
+import { DiagnosticsPanel } from '../diagnostics/DiagnosticsPanel';
+import { diagnosticsStore } from '../diagnostics/diagnosticsStore';
 import { LOCATION_CONFIG } from '../../config/location';
-import { checkApiHealth, fetchNearby, locationApiConfig, publishPresence, stopPresence, type NearbyUser } from './api';
+import { checkApiHealth, fetchNearby, publishPresence, stopPresence, type NearbyUser } from './api';
 import { loadDemoUser, type DemoUser } from './identity';
 import { locationAvailability } from './status';
 import { shouldPublishLocation, type Coordinates } from './throttle';
@@ -133,6 +135,9 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
     animation.start();
     return () => animation.stop();
   }, [pulse]);
+  useEffect(() => {
+    diagnosticsStore.update({ apiHealth, lastApiError: latestApiError, locationMode: locationMode === 'simulated' ? `simulated (${testRole === 'playerA' ? 'Test Player A' : 'Test Player B'})` : 'real device GPS', ...(user ? { userId: user.userId } : {}) });
+  }, [apiHealth, latestApiError, locationMode, testRole, user]);
   const mapNearby = nearbyUsersForMap(nearby, user?.userId ?? null);
   const runHealthCheck = async () => { try { await checkApiHealth(); setApiHealth('reachable'); setLatestApiError(null); } catch (error) { setApiHealth('unreachable'); setLatestApiError(error instanceof Error ? error.message : 'Health check failed'); } };
   const nearbyLabel = nearby.length > 0 ? `${nearby.length} nearby · closest ${nearby[0]?.distanceMeters} m` : status === 'empty' ? 'No one nearby' : undefined;
@@ -161,7 +166,7 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: colors.accentBg }}>
         <View style={{ width: 64, height: 64, borderRadius: radii.md, borderWidth: borders.default, borderColor: colors.accentBorder, backgroundColor: '#4A90E222', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }}><AvatarBadge variant="opponent" size={56} ringColor="transparent" /></View>
         <View style={{ flex: 1, gap: spacing.xs }}>
-          <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900' }]} numberOfLines={1}>{selectedOpponent.displayName}</Text>
+          <Text style={[typography.bodyLg, { color: colors.text, ...weight('900') }]} numberOfLines={1}>{selectedOpponent.displayName}</Text>
           <Pill label={`Approximately ${selectedOpponent.distanceMeters} m away`} tone="info" />
         </View>
       </View>
@@ -174,7 +179,8 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
     {sharing ? <Action title="Stop sharing location" variant="secondary" onPress={() => { void stopSharing(); }} /> : user && <Action title="Start sharing location" onPress={() => { void startSharing(user); }} />}
     {simulationEnabled && <Collapsible title="Developer tools">
       <Card><Text style={styles.heading}>Development location test</Text><Text style={styles.body}>Choose Test Player A on one device and Test Player B on the other. Keep both map screens open; presence expires after approximately one minute.</Text><View style={{ gap: 8 }}><Action title="Test Player A" variant="secondary" onPress={() => { void selectLocationMode('playerA'); }} /><Action title="Test Player B" variant="secondary" onPress={() => { void selectLocationMode('playerB'); }} /><Action title="Use real device GPS" variant="secondary" onPress={() => { void selectLocationMode('real'); }} /></View></Card>
-      <Card><Text style={styles.heading}>API diagnostics</Text><Text style={styles.body}>API: {locationApiConfig.apiUrl}</Text><Text style={styles.body}>Device: {locationApiConfig.mode}</Text><Text style={styles.body}>Health: {apiHealth === 'reachable' ? 'reachable' : apiHealth === 'unreachable' ? 'unreachable' : 'checking…'}</Text><Text style={styles.body}>Location mode: {locationMode}{locationMode === 'simulated' ? ` (${testRole === 'playerA' ? 'Test Player A' : 'Test Player B'})` : ''}</Text><Text style={styles.body}>User ID: {user?.userId ?? 'loading…'}</Text><Text style={styles.body}>Last publish: {lastPublishAt ?? '—'}</Text><Text style={styles.body}>Last nearby poll: {lastNearbyPollAt ?? '—'}</Text><Text style={styles.body}>Latest API error: {latestApiError ?? '—'}</Text><Action title="Check API health" variant="secondary" onPress={() => { void runHealthCheck(); }} /></Card>
+      <Card><Text style={styles.heading}>Presence sync</Text><Text style={styles.body}>Last publish: {lastPublishAt ?? '—'}</Text><Text style={styles.body}>Last nearby poll: {lastNearbyPollAt ?? '—'}</Text><Action title="Check API health" variant="secondary" onPress={() => { void runHealthCheck(); }} /></Card>
     </Collapsible>}
+    <DiagnosticsPanel />
   </View>;
 }

@@ -119,9 +119,10 @@ export function createApp(db: DbClient = pool): Hono {
     const distance = Number(proximityRow.proximity_meters);
     if (distance > NEARBY_RADIUS_METERS) return context.json({ error: 'user is outside the challenge radius' }, 409);
     const duplicate = await db.query<{ challenge_id: string }>(
-      `SELECT challenge_id FROM challenges WHERE status = 'pending' AND expires_at > NOW()
+      `SELECT challenge_id FROM challenges WHERE status IN ('pending', 'accepted', 'configuring', 'ready', 'active') AND expires_at > NOW()
        AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) LIMIT 1`, [senderId, receiverId]);
-    if (duplicate.rows.length > 0) return context.json({ error: 'a pending challenge already exists' }, 409);
+    // Any open challenge between the pair blocks a new one, so re-entering the challenge screen cannot fork a second match.
+    if (duplicate.rows.length > 0) return context.json({ error: 'an open challenge already exists with this player' }, 409);
     const createdAt = new Date();
     const result = await db.query<ChallengeRow>(
       `INSERT INTO challenges (challenge_id, sender_id, receiver_id, sender_display_name, receiver_display_name, status, created_at, expires_at, proximity_meters)
