@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BackHandler, ScrollView, StatusBar, Text } from 'react-native';
+import { BackHandler, ScrollView, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Action, Card, styles } from './src/components/ui';
 import { ProgressionScreen } from './src/features/progression/ProgressionScreen';
@@ -34,7 +34,12 @@ export default function App() {
         <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
         <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen session={workoutSession} /> : screen === 'progression' ? <ProgressionScreen /> : screen === 'map' ? <MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /> : <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
+        {screen === 'workout' ? <WorkoutScreen session={workoutSession} /> : screen === 'progression' ? <ProgressionScreen /> : <>
+          {/* Keep the map mounted (hidden) on the challenge screen: unmounting it stops presence,
+              and the server rejects challenges unless both players have active presence. */}
+          <View style={{ display: screen === 'map' ? 'flex' : 'none' }}><MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /></View>
+          {screen === 'challenge' && <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
+        </>}
       </>}
     </ScrollView>
   </SafeAreaView></SafeAreaProvider>;

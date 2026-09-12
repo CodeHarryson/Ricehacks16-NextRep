@@ -39,6 +39,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSent = useRef<{ coordinates: Coordinates; sentAt: number } | null>(null);
   const currentRef = useRef<Coordinates | null>(null);
+  const accuracyRef = useRef(100);
   const mounted = useRef(true);
 
   const refreshNearby = useCallback(async (demoUser: DemoUser, coordinates: Coordinates) => {
@@ -58,8 +59,10 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
   }, []);
   const startPolling = useCallback((demoUser: DemoUser) => {
     if (poller.current) clearInterval(poller.current);
-    poller.current = setInterval(() => { if (currentRef.current) void refreshNearby(demoUser, currentRef.current); }, LOCATION_CONFIG.nearbyPollIntervalMs);
-  }, [refreshNearby]);
+    // Presence expires after a minute; simulated roles and stationary phones produce no
+    // location callbacks, so re-publish (throttled) on every poll to stay visible.
+    poller.current = setInterval(() => { const coordinates = currentRef.current; if (coordinates) void publish(demoUser, coordinates, accuracyRef.current).then(() => refreshNearby(demoUser, coordinates)); }, LOCATION_CONFIG.nearbyPollIntervalMs);
+  }, [publish, refreshNearby]);
   const stopSharing = useCallback(async () => {
     setSharing(false); watcher.current?.remove(); watcher.current = null;
     if (poller.current) clearInterval(poller.current); poller.current = null;
@@ -73,7 +76,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
       if (availability !== 'ready') { setStatus(availability); return; }
       watcher.current?.remove();
       watcher.current = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Balanced, timeInterval: LOCATION_CONFIG.presenceUpdateIntervalMs, distanceInterval: LOCATION_CONFIG.minimumMovementMeters }, (location) => {
-        const coordinates = coordinatesOf(location); currentRef.current = coordinates; setCurrent(coordinates);
+        const coordinates = coordinatesOf(location); currentRef.current = coordinates; accuracyRef.current = location.coords.accuracy ?? 100; setCurrent(coordinates);
         void publish(demoUser, coordinates, location.coords.accuracy ?? 100).then((sent) => { if (sent) void refreshNearby(demoUser, coordinates); });
       });
       if (currentRef.current) { const sent = await publish(demoUser, currentRef.current, 100, true); if (sent) await refreshNearby(demoUser, currentRef.current); }
@@ -82,7 +85,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
   }, [publish, refreshNearby, startPolling]);
   const startSimulation = useCallback(async (demoUser: DemoUser, role: Exclude<LocationTestRole, 'real'>) => {
     const coordinates = simulatedCoordinates(role); if (!coordinates) return;
-    watcher.current?.remove(); watcher.current = null; setLocationMode('simulated'); setTestRole(role); currentRef.current = coordinates; setCurrent(coordinates);
+    watcher.current?.remove(); watcher.current = null; setLocationMode('simulated'); setTestRole(role); currentRef.current = coordinates; accuracyRef.current = 5; setCurrent(coordinates);
     const sent = await publish(demoUser, coordinates, 5, true); if (sent) await refreshNearby(demoUser, coordinates);
     startPolling(demoUser);
   }, [publish, refreshNearby, startPolling]);
