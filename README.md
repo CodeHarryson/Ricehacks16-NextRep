@@ -113,7 +113,8 @@ host the native integration; there is no demonstrated need for bare RN.
 | Workout UI + audio | src/features/workout/WorkoutScreen.tsx, src/components | Home/setup/progression UI implemented; event feedback and audio planned |
 | Controller + storage | src/features/workout/controller.ts, src/features/progression | Live five-rep set controller, idempotent local completion reward, and schema-v2 XP/OVR/coin persistence implemented; rest/upgrades planned |
 
-Shared contracts live in `src/contracts`; five-rep goal in `src/config`.
+Shared contracts live in `src/contracts`; five-rep and location thresholds live in
+`src/config`. The demo nearby map is available from the home screen.
 Screens are intentionally simple local navigation with Android back handling.
 Tracking now reports native initialization, tracking, lost and error states and
 feeds valid landmarks into the pure analyzer. No simulated counts, ratings, or
@@ -123,6 +124,27 @@ on physical devices; a bundle passing does not validate native code.
 See [workout ownership notes](src/features/workout/README.md) for end-of-attempt
 rating semantics, neutral tracking loss, controller-owned totals, and the
 idempotent local XP/OVR grant. Do not connect rewards directly to frames.
+
+## Tiger Data presence setup
+
+The Stage 3 Step 2 presence API is under `server/`. It keeps Tiger Data
+credentials server-side and uses PostGIS geography plus a Timescale hypertable
+when the extensions are available. The mobile app only receives the public API
+URL; it never receives `TIGER_DATABASE_URL`.
+
+After creating `server/.env` from [server/.env.example](server/.env.example), run:
+
+```sh
+npm run --prefix server migrate
+npm run --prefix server start
+```
+
+Set `EXPO_PUBLIC_API_URL` in a local ignored `.env` (see `.env.example`) to the
+reachable API URL for the development device. The map uses a generated demo user
+ID stored locally until authentication exists. This is demo-only behavior, not
+identity or access control. Presence is foreground-only, expires after 60 seconds,
+and is quantized before other users see it; use `npm run --prefix server cleanup`
+for scheduled expired-row cleanup.
 
 ## First real-phone test: camera → landmarks
 

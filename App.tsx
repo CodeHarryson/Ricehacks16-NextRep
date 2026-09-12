@@ -3,10 +3,11 @@ import { BackHandler, ScrollView, StatusBar, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Action, Card, styles } from './src/components/ui';
 import { ProgressionScreen } from './src/features/progression/ProgressionScreen';
+import { MapScreen } from './src/features/location/MapScreen';
 import { WorkoutScreen } from './src/features/workout/WorkoutScreen';
 
 export default function App() {
-  const [screen, setScreen] = useState<'home' | 'workout' | 'progression'>('home');
+  const [screen, setScreen] = useState<'home' | 'workout' | 'progression' | 'map'>('home');
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (screen === 'home') return false;
@@ -22,12 +23,13 @@ export default function App() {
         <Text accessibilityRole="header" style={styles.title}>NextRep</Text>
         <Text style={styles.body}>Five squats. One small step toward your next level.</Text>
         <Card><Text style={styles.heading}>Your next rep starts with you.</Text>
-          <Text style={styles.body}>Set up your camera and get ready. This development build includes camera setup; live squat analysis is coming next.</Text></Card>
+        <Text style={styles.body}>Track a live squat set or see approximate nearby demo users.</Text></Card>
         <Action title="Start workout" onPress={() => setScreen('workout')} />
         <Action title="View progression" onPress={() => setScreen('progression')} />
+        <Action title="Open nearby map" onPress={() => setScreen('map')} />
       </> : <>
         <Action title="Back to home" onPress={() => setScreen('home')} />
-        {screen === 'workout' ? <WorkoutScreen /> : <ProgressionScreen />}
+        {screen === 'workout' ? <WorkoutScreen /> : screen === 'progression' ? <ProgressionScreen /> : <MapScreen />}
       </>}
     </ScrollView>
   </SafeAreaView></SafeAreaProvider>;
