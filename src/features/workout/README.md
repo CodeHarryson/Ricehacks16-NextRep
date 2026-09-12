@@ -16,7 +16,10 @@ idempotently submitted. Battle outcomes now resolve server-side and grant the
 versioned `battle-reward-v1` local policy exactly once: winner +50 XP/+100 coins,
 loser +25 XP/+25 coins, draw +25 XP/+50 coins. Battle rewards never change
 permanent OVR. Advanced leaderboards, shops, richer synchronization, and
-production authentication remain planned.
+production authentication remain planned. The post-match card distinguishes
+local score preparation, server submission, pending resolution, and completed
+server resolution; an opponent no-show is shown as a cancelled challenge with no
+battle reward. Physical two-device verification remains pending.
 
 Progression serializes AsyncStorage read-modify-write operations. A completed set
 uses deterministic completion/reward IDs and saves XP, OVR, coins, completed-workout

@@ -20,7 +20,7 @@ export interface Challenge {
   startedAt: string | null;
 }
 export interface ChallengeResult { resultId: string; challengeId: string; participantId: string; configVersion: number; exercise: string; countedReps: number; greenReps: number; yellowReps: number; redAttempts: number; neutralAttempts: number; totalScore: number; scorePolicyVersion: string; startedAt: string; endedAt: string; submittedAt: string; }
-export interface ChallengeResolution { status: 'pending' | 'resolved'; winnerId?: string | null; winningScore?: number; resolvedAt?: string | null; }
+export interface ChallengeResolution { status: 'pending' | 'resolved' | 'cancelled'; winnerId?: string | null; winningScore?: number; resolvedAt?: string | null; }
 
 async function request(path: string, init: RequestInit): Promise<Response> {
   const response = await fetch(`${API_URL}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) } });

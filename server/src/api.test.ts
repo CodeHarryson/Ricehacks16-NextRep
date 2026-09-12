@@ -165,3 +165,88 @@ test('challenge result timestamps are bounded by the shared server window', asyn
   assert.equal((await send(new Date(startedAt.getTime() + 11_000), new Date(startedAt.getTime() + 41_000))).status, 400);
   assert.equal((await send(new Date(startedAt.getTime() + 11_000), new Date(startedAt.getTime() + 10_000))).status, 400);
 });
+
+type ResolutionState = { resolution_status: string; winner_id: string | null; winning_score: number | null; resolved_at: Date | null };
+type ResultFixture = { result_id: string; challenge_id: string; participant_id: string; config_version: number; exercise: string; counted_reps: number; green_reps: number; yellow_reps: number; red_attempts: number; neutral_attempts: number; total_score: number; score_policy_version: string; started_at: Date | string; ended_at: Date | string; submitted_at: Date | string; idempotency_key: string };
+
+function resolutionDb(challenge: ChallengeFixture) {
+  const results: ResultFixture[] = [];
+  const resolution: ResolutionState = { resolution_status: 'pending', winner_id: null, winning_score: null, resolved_at: null };
+  const queries: string[] = [];
+  const db = { query: async <T>(sql: string, params: unknown[] = []) => {
+    queries.push(sql);
+    if (sql.includes('SELECT * FROM challenges') && sql.includes('(sender_id')) {
+      const participant = String(params[1] ?? '');
+      return ['sender', 'receiver'].includes(participant) ? { rows: [{ ...challenge, resolution_status: resolution.resolution_status } as T], rowCount: 1 } : { rows: [], rowCount: 0 };
+    }
+    if (sql.startsWith('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2')) {
+      return { rows: results.filter((item) => item.participant_id === params[1]) as T[], rowCount: results.filter((item) => item.participant_id === params[1]).length };
+    }
+    if (sql.includes('INSERT INTO challenge_participant_results')) {
+      const row: ResultFixture = { result_id: String(params[0]), challenge_id: String(params[1]), participant_id: String(params[2]), config_version: Number(params[3]), exercise: String(params[4]), counted_reps: Number(params[5]), green_reps: Number(params[6]), yellow_reps: Number(params[7]), red_attempts: Number(params[8]), neutral_attempts: Number(params[9]), total_score: Number(params[10]), score_policy_version: 'score-v1', started_at: new Date(String(params[11])), ended_at: new Date(String(params[12])), submitted_at: new Date(), idempotency_key: String(params[13]) };
+      if (!results.some((item) => item.participant_id === row.participant_id)) results.push(row);
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.startsWith('SELECT * FROM challenge_participant_results WHERE challenge_id = $1')) return { rows: results as T[], rowCount: results.length };
+    if (sql.startsWith('UPDATE challenges SET resolution_status')) {
+      if (resolution.resolution_status === 'pending') {
+        resolution.resolution_status = sql.includes("= 'cancelled'") ? 'cancelled' : 'resolved';
+        resolution.winner_id = resolution.resolution_status === 'cancelled' ? null : (params[1] == null ? null : String(params[1]));
+        resolution.winning_score = resolution.resolution_status === 'cancelled' ? null : Number(params[2]);
+        resolution.resolved_at = new Date();
+      }
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('SELECT resolution_status')) return { rows: [resolution as T], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
+  } };
+  return { db, results, resolution, queries };
+}
+
+function resultRequest(startedAt: Date, endedAt: Date, greenReps: number, idempotencyKey: string) {
+  return { configVersion: 1, exercise: 'bodyweight_squat', greenReps, yellowReps: 0, redAttempts: 0, neutralAttempts: 0, startedAt: startedAt.toISOString(), endedAt: endedAt.toISOString(), idempotencyKey };
+}
+
+test('real result routes resolve the higher score and preserve it on retries', async () => {
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: new Date(Date.now() - 20_000) });
+  const { db, resolution, queries } = resolutionDb(challenge);
+  const app = createApp(db);
+  const start = new Date(Date.now() - 5_000); const end = new Date(Date.now() - 1_000);
+  const post = (userId: string, green: number, key: string) => app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': userId, 'x-idempotency-key': key }, body: JSON.stringify(resultRequest(start, end, green, key)) });
+  assert.equal((await post('sender', 2, 'sender-key')).status, 201);
+  const second = await post('receiver', 3, 'receiver-key');
+  assert.equal(second.status, 201);
+  assert.equal(resolution.resolution_status, 'resolved');
+  assert.equal(resolution.winner_id, 'receiver');
+  assert.equal(resolution.winning_score, 330);
+  assert.ok(queries.some((sql) => sql.includes('UPDATE challenges SET resolution_status')));
+  const retry = await post('receiver', 1, 'receiver-key');
+  assert.equal(retry.status, 200);
+  assert.equal(resolution.winner_id, 'receiver');
+  assert.equal(resolution.winning_score, 330);
+  const resolved = await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'sender' } });
+  assert.equal(resolved.status, 200);
+  assert.deepEqual((await resolved.json()).resolution, { status: 'resolved', winnerId: 'receiver', winningScore: 330, resolvedAt: resolution.resolved_at?.toISOString() });
+});
+
+test('equal scores resolve as a draw and only participants can submit or read', async () => {
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: new Date(Date.now() - 20_000) });
+  const { db, resolution } = resolutionDb(challenge); const app = createApp(db);
+  const start = new Date(Date.now() - 5_000); const end = new Date(Date.now() - 1_000);
+  const post = (userId: string) => app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': userId, 'x-idempotency-key': `${userId}-key` }, body: JSON.stringify(resultRequest(start, end, 2, `${userId}-key`)) });
+  await post('sender'); await post('receiver');
+  assert.equal(resolution.winner_id, null); assert.equal(resolution.winning_score, 220);
+  assert.equal((await post('intruder')).status, 404);
+  assert.equal((await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'intruder' } })).status, 404);
+});
+
+test('one result is cancelled after the deadline using the opponent no-show rule', async () => {
+  const startedAt = new Date(Date.now() - 50_000);
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: startedAt });
+  const { db, resolution } = resolutionDb(challenge); const app = createApp(db);
+  const sessionStart = new Date(startedAt.getTime() + 10_000); const deadline = new Date(sessionStart.getTime() + 30_000);
+  const response = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'timeout-key' }, body: JSON.stringify(resultRequest(sessionStart, deadline, 1, 'timeout-key')) });
+  assert.equal(response.status, 201); assert.equal(resolution.resolution_status, 'cancelled'); assert.equal(resolution.winner_id, null); assert.equal(resolution.winning_score, null);
+  const later = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'receiver', 'x-idempotency-key': 'late-key' }, body: JSON.stringify(resultRequest(sessionStart, deadline, 5, 'late-key')) });
+  assert.equal(later.status, 409); assert.equal(resolution.winner_id, null); assert.equal(resolution.winning_score, null);
+});

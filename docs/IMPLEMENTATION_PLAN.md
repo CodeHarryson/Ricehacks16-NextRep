@@ -94,17 +94,13 @@ the consistency UI ships:
 - Derive progress from saved, deduplicated completed-workout events so reloads,
   repeated callbacks, or multiple workouts on one local date cannot inflate it.
 
-### Battle scoring — proposed, not accepted
+### Battle scoring — implemented (`score-v1`)
 
-The current recommendation is 100 points per completed rep, plus 10 points for
-each green rep. Yellow completed reps receive base points; red/neutral attempts
-receive zero. Cap awarded points at the agreed workout targets. Enable quality
-bonuses only after consistent cross-device testing; until then, completion-only
-scoring with draws is the fallback.
-
-**Unresolved:** removing OVR from battle scoring was recommended but has not been
-explicitly approved. Keep battle points and permanent earned OVR separate in data
-and UI until the team decides whether OVR affects a match.
+Completed green reps score 110 points and yellow reps score 100 points. Red and
+neutral attempts score zero; counted reps and points are capped at the configured
+workout target. The server validates and resolves participant results, including
+draws, and client battle rewards are granted idempotently after resolution.
+Battle points and permanent OVR are separate systems; battle rewards never change OVR.
 
 ### Activity bonus — accepted future direction, not MVP
 
@@ -298,9 +294,9 @@ gaps remain in [native-integration.md](native-integration.md).
 | Native pose | Integrated but untested on phones: `react-native-mediapipe` live-stream callbacks normalize landmarks into `PoseFrame` and report tracking health. Real device inference quality, model behavior, orientation, and lifecycle validation remain required. |
 | Squat logic | Partial implementation: `src/features/squat` now has pure pixel-space thigh-inclination features, standing calibration, time smoothing, visibility/framing/view/jump/gap gates, temporal state machine, attempt ratings, exactly-once timestamps, replay fixtures, and deterministic logic tests. Real MediaPipe landmark quality, threshold calibration, and device validation remain planned. |
 | Feedback | Planned: setup text exposes the green/yellow/red/neutral model only through documentation/contracts; no live result display or audio is implemented. |
-| Workout/game control | Solo and challenge camera sessions use validated configurations, synchronized challenge start times, a shared countdown/deadline clock, configured sets, rest periods, capped attempt processing, `score-v1` scoring, scoreable timeout finalization, local solo performance persistence, and idempotent server challenge-result submission. Battle rewards and advanced leaderboards remain planned. |
+| Workout/game control | Solo and challenge camera sessions use validated configurations, synchronized challenge start times, a shared countdown/deadline clock, configured sets, rest periods, capped attempt processing, `score-v1` scoring, scoreable timeout finalization, local solo performance persistence, server challenge-result submission/resolution, and idempotent `battle-reward-v1` grants. Advanced leaderboards remain planned. |
 | Progression | Schema-v2 local player state persists XP, capped earned OVR, coins, processed attempt/reward IDs and completed workout IDs. One solo completion reward is serialized and idempotent across repeated delivery/reload. Upgrades, weekly target/streak and last-workout data are not implemented. |
-| Location/battle | Stage 3 location publishing, nearby map, proximity challenge handshake, shared squat configuration, challenge-aware camera navigation, timed session control, server-validated result submission, result polling/resolution, and idempotent `battle-reward-v1` grants are implemented. Battle rewards never change permanent OVR; advanced leaderboards, shops, and production authentication remain planned. |
+| Location/battle | Stage 3 location publishing, nearby map, proximity challenge handshake, shared squat configuration, challenge-aware camera navigation, timed session control, server-validated result submission, result polling/resolution, and idempotent `battle-reward-v1` grants are implemented. If only one result arrives by the deadline, the server cancels for opponent no-show with no winner or reward. Battle rewards never change permanent OVR; advanced leaderboards, shops, and production authentication remain planned. |
 | Validation | Typecheck, lint, JS bundle and pod install previously passed. Native iOS compile is blocked by the documented Xcode 26.6/RN `fmt` issue; Android native compile is blocked because this host lacks a Java runtime. No phone or inference test has been performed. |
 
 See [validation.md](validation.md) for exact prior commands and blockers. Do not
