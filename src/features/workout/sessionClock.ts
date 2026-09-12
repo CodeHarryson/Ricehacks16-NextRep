@@ -4,10 +4,10 @@ export function createSessionClock(now: number, matchTimeLimitSeconds: number, c
   return { countdownEndsAt, deadline: countdownEndsAt + matchTimeLimitSeconds * 1000, started: now >= countdownEndsAt, expired: now >= countdownEndsAt + matchTimeLimitSeconds * 1000, remainingSeconds: Math.max(0, Math.ceil((countdownEndsAt + matchTimeLimitSeconds * 1000 - Math.max(now, countdownEndsAt)) / 1000)) };
 }
 export function advanceSessionClock(clock: SessionClock, now: number): SessionClock {
-  if (!clock.started && now < clock.countdownEndsAt) return clock;
-  const started = true;
-  const remainingSeconds = Math.max(0, Math.ceil((clock.deadline - now) / 1000));
-  return { ...clock, started, expired: remainingSeconds === 0, remainingSeconds };
+  const started = now >= clock.countdownEndsAt;
+  const expired = now >= clock.deadline;
+  const remainingSeconds = Math.max(0, Math.ceil((clock.deadline - Math.max(now, clock.countdownEndsAt)) / 1000));
+  return { ...clock, started, expired, remainingSeconds };
 }
 export function canAcceptSessionAttempt(clock: SessionClock, now: number): boolean {
   return clock.started && !clock.expired && now < clock.deadline;
