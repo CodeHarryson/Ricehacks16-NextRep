@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { Action, Card, styles } from '../../components/ui';
+import { Action, Card, IconButton, ScreenHeader, styles } from '../../components/ui';
+import { Banner, Pill } from '../../components/display';
+import { colors, spacing, typography } from '../../theme/tokens';
+import { CHALLENGE_STATUS_VISUALS, ENDED_REASON_TONES } from './components/challengeVisuals';
+import { ConfigStepperRow, PlayerRow, VsBanner } from './components/ChallengeParts';
 import { acceptChallenge, acceptChallengeConfig, createChallenge, declineChallenge, startChallenge, updateChallengeConfig, type Challenge, type ChallengeConfig } from './api';
 import { buildChallengeWorkoutSession, ENDED_CHALLENGE_COPY, findActiveChallenge, OPEN_STATUSES, opponentNameFor, shouldAutoLaunchWorkout } from './challengeState';
 import { OPPONENT_STATUS_COPY, opponentStatusFromChallenge } from './opponentStatus';
@@ -55,80 +59,80 @@ export function ChallengeScreen({ opponent, nearbyUsers, launchedChallengeIds, o
     mutate((demoUser) => updateChallengeConfig(demoUser.userId, activeChallenge.challengeId, { ...editable(config), [field]: value }));
   };
 
-  return <View style={{ gap: 16 }}>
-    <Action title="Back to map" onPress={onBack} />
-    <Text style={styles.eyebrow}>PROXIMITY / CHALLENGES</Text>
-    <Text style={styles.title}>Choose your next test.</Text>
-    <Text style={styles.body}>Demo identity: {user?.displayName ?? 'loading…'} (local-only, not authentication).</Text>
+  const activeStatus = activeChallenge && user ? opponentStatusFromChallenge(activeChallenge, user.userId) : null;
+  return <View style={{ gap: spacing.lg }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+      <IconButton glyph="‹" label="Back to map" onPress={onBack} />
+      <Text style={styles.label}>Back to map</Text>
+    </View>
+    <ScreenHeader eyebrow="PROXIMITY / CHALLENGES" title="Choose your next test." subtitle={`Demo identity: ${user?.displayName ?? 'loading…'} (local-only, not authentication).`} />
 
-    {list.loading && <Card><Text style={styles.heading}>Loading challenges…</Text><Text style={styles.body}>Checking the challenge server for invitations and active matches.</Text></Card>}
-    {list.identityError && <Card><Text style={styles.heading}>Challenges unavailable</Text><Text style={styles.body}>{list.identityError}</Text></Card>}
-    {list.loadError && <Card>
-      <Text style={styles.heading}>{list.loadError.kind === 'network' ? 'Challenge server unreachable' : 'Could not load challenges'}</Text>
-      <Text style={styles.body}>{list.loadError.message}</Text>
-      {challenges.length > 0 && <Text style={styles.body}>Showing the last known challenges.</Text>}
-      <Action title="Retry" onPress={list.refresh} />
+    {list.loading && <Banner tone="info" title="Loading challenges…" message="Checking the challenge server for invitations and active matches." live />}
+    {list.identityError && <Banner tone="danger" title="Challenges unavailable" message={list.identityError} />}
+    {list.loadError && <Banner tone={list.loadError.kind === 'network' ? 'warning' : 'danger'} title={list.loadError.kind === 'network' ? 'Challenge server unreachable' : 'Could not load challenges'} message={list.loadError.message} live>
+      {challenges.length > 0 && <Text style={styles.caption}>Showing the last known challenges.</Text>}
+      <Action title="Retry" variant="secondary" size="sm" onPress={list.refresh} />
+    </Banner>}
+    {list.actionError && <Banner tone="danger" title="Challenge request failed" message={list.actionError} live>
+      <Action title="Dismiss" variant="secondary" size="sm" onPress={list.dismissActionError} />
+    </Banner>}
+    {list.notices.map((notice) => <Banner key={`ended-${notice.challengeId}`} tone={ENDED_REASON_TONES[notice.reason]} title={ENDED_CHALLENGE_COPY[notice.reason].heading} message={ENDED_CHALLENGE_COPY[notice.reason].body(notice.opponentName)} live>
+      <Action title="Dismiss" variant="secondary" size="sm" onPress={() => list.dismissNotice(notice.challengeId)} />
+    </Banner>)}
+
+    {opponent && <Card variant="selected">
+      <Text style={styles.label}>SELECTED OPPONENT</Text>
+      <PlayerRow name={opponent.displayName} detail={`Approximately ${opponent.distanceMeters} m away`} />
+      <Action title={busy ? 'Sending…' : '⚔ Send challenge'} variant="accent" disabled={busy} accessibilityLabel="Send challenge" onPress={() => mutate((demoUser) => createChallenge(demoUser, opponent))} />
     </Card>}
-    {list.actionError && <Card>
-      <Text style={styles.heading}>Challenge request failed</Text>
-      <Text style={styles.body}>{list.actionError}</Text>
-      <Action title="Dismiss" onPress={list.dismissActionError} />
+
+    {activeChallenge && config && user && <Card variant="raised">
+      <VsBanner selfName={user.displayName} opponentName={opponentNameFor(activeChallenge, user.userId)} statusLabel={activeStatus ? OPPONENT_STATUS_COPY[activeStatus].label : CHALLENGE_STATUS_VISUALS[activeChallenge.status].label} statusTone={CHALLENGE_STATUS_VISUALS[activeChallenge.status].tone} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
+        <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900', flexShrink: 1 }]}>Shared squat configuration</Text>
+        <Pill label={CHALLENGE_STATUS_VISUALS[activeChallenge.status].label} tone={CHALLENGE_STATUS_VISUALS[activeChallenge.status].tone} solid />
+      </View>
+      <Text style={styles.caption}>Exercise: bodyweight squat · Version {config.configVersion}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        <Pill label={`Sender: ${activeChallenge.acceptance.senderAcceptedAt ? 'accepted ✓' : 'waiting'}`} tone={activeChallenge.acceptance.senderAcceptedAt ? 'success' : 'warning'} />
+        <Pill label={`Receiver: ${activeChallenge.acceptance.receiverAcceptedAt ? 'accepted ✓' : 'waiting'}`} tone={activeChallenge.acceptance.receiverAcceptedAt ? 'success' : 'warning'} />
+      </View>
+      {CONFIG_FIELDS.map(({ field, label }) => <ConfigStepperRow key={field} label={label} value={config[field]} locked={activeChallenge.locked} onDecrement={() => changeConfig(field, -1)} onIncrement={() => changeConfig(field, 1)} />)}
+      <Text style={[typography.label, { color: activeChallenge.locked ? colors.textMuted : activeChallenge.status === 'ready' ? colors.accentDark : colors.streakDark }]}>{activeChallenge.locked ? '🔒 Workout settings locked' : activeChallenge.status === 'ready' ? 'Both players ready' : 'Waiting for the other player'}</Text>
+      {activeChallenge.status === 'configuring' && !activeChallenge.acceptance.senderAcceptedAt && !activeChallenge.acceptance.receiverAcceptedAt && <Banner tone="warning" title="Configuration changed; acceptance reset." />}
+      {(activeChallenge.status === 'accepted' || activeChallenge.status === 'configuring') && <Action title="Accept configuration" disabled={busy} onPress={() => mutate((demoUser) => acceptChallengeConfig(demoUser.userId, activeChallenge.challengeId))} />}
+      {activeChallenge.status === 'ready' && <Action title="Start workout" size="lg" variant="danger" disabled={busy} onPress={() => mutate((demoUser) => startChallenge(demoUser.userId, activeChallenge.challengeId))} />}
+      {activeChallenge.status === 'active' && <Banner tone="success" title="Workout active — camera session launched." live>
+        {launchedChallengeIds.has(activeChallenge.challengeId) && <Action title="Return to workout" onPress={() => rejoinWorkout(activeChallenge)} />}
+      </Banner>}
     </Card>}
-    {list.notices.map((notice) => <Card key={`ended-${notice.challengeId}`}>
-      <Text style={styles.heading}>{ENDED_CHALLENGE_COPY[notice.reason].heading}</Text>
-      <Text style={styles.body}>{ENDED_CHALLENGE_COPY[notice.reason].body(notice.opponentName)}</Text>
-      <Action title="Dismiss" onPress={() => list.dismissNotice(notice.challengeId)} />
+
+    {incoming.map((challenge) => <Card key={challenge.challengeId} tone="info">
+      <Text style={[styles.label, { color: colors.accentDark }]}>INCOMING CHALLENGE</Text>
+      <PlayerRow name={challenge.senderDisplayName} detail={`${challenge.proximityMeters} m away`} trailing={<Pill label={CHALLENGE_STATUS_VISUALS.pending.label} tone="warning" />} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <Action title="Accept" grow disabled={busy} onPress={() => mutate((demoUser) => acceptChallenge(demoUser.userId, challenge.challengeId))} />
+        <Action title="Decline" grow variant="secondary" disabled={busy} onPress={() => mutate((demoUser) => declineChallenge(demoUser.userId, challenge.challengeId))} />
+      </View>
     </Card>)}
 
-    {opponent && <Card>
-      <Text style={styles.heading}>Selected opponent</Text>
-      <Text style={styles.body}>{opponent.displayName} · approximately {opponent.distanceMeters} m away</Text>
-      <Action title={busy ? 'Sending…' : 'Send challenge'} onPress={() => mutate((demoUser) => createChallenge(demoUser, opponent))} />
-    </Card>}
     <Card>
-      <Text style={styles.heading}>Nearby players</Text>
+      <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900' }]}>Nearby players</Text>
       {otherNearby.length === 0
         ? <Text style={styles.body}>{opponent ? 'No other players nearby.' : 'No players nearby right now. Both devices need location sharing on, within 250 m.'}</Text>
         : otherNearby.map((nearbyUser) => {
           const open = openChallengeWith(nearbyUser.userId);
-          return <View key={nearbyUser.userId} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <Text style={[styles.body, { flexShrink: 1 }]}>{nearbyUser.displayName} · ~{nearbyUser.distanceMeters} m</Text>
-            {open ? <Text style={styles.body}>{open.status}</Text> : <Action title={busy ? 'Sending…' : 'Challenge'} onPress={() => mutate((demoUser) => createChallenge(demoUser, nearbyUser))} />}
-          </View>;
+          return <PlayerRow key={nearbyUser.userId} name={nearbyUser.displayName} detail={`~${nearbyUser.distanceMeters} m`} trailing={open
+            ? <Pill label={CHALLENGE_STATUS_VISUALS[open.status].label} tone={CHALLENGE_STATUS_VISUALS[open.status].tone} />
+            : <Action title={busy ? 'Sending…' : 'Challenge'} size="sm" variant="accent" disabled={busy} accessibilityLabel={`Challenge ${nearbyUser.displayName}`} onPress={() => mutate((demoUser) => createChallenge(demoUser, nearbyUser))} />} />;
         })}
     </Card>
 
-    {!list.loading && !list.loadError && incoming.length === 0 && outgoing.length === 0 && !activeChallenge && <Text style={styles.body}>No challenges yet. Challenge a nearby player to get started.</Text>}
-    {incoming.map((challenge) => <Card key={challenge.challengeId}>
-      <Text style={styles.heading}>Incoming challenge</Text>
-      <Text style={styles.body}>{challenge.senderDisplayName} · {challenge.proximityMeters} m away</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Action title="Accept" onPress={() => mutate((demoUser) => acceptChallenge(demoUser.userId, challenge.challengeId))} />
-        <Action title="Decline" onPress={() => mutate((demoUser) => declineChallenge(demoUser.userId, challenge.challengeId))} />
-      </View>
-    </Card>)}
-    {outgoing.map((challenge) => <Text key={challenge.challengeId} style={styles.body}>Outgoing: {challenge.receiverDisplayName} · {challenge.status}{user && challenge.status === 'pending' ? ` · ${OPPONENT_STATUS_COPY[opponentStatusFromChallenge(challenge, user.userId)].label}` : ''}</Text>)}
-
-    {activeChallenge && config && user && <Card>
-      <Text style={styles.heading}>Shared squat configuration</Text>
-      <Text style={styles.body}>Opponent: {opponentNameFor(activeChallenge, user.userId)} · {OPPONENT_STATUS_COPY[opponentStatusFromChallenge(activeChallenge, user.userId)].label}</Text>
-      <Text style={styles.body}>Exercise: bodyweight squat · Version {config.configVersion}</Text>
-      <Text style={styles.body}>Sender: {activeChallenge.acceptance.senderAcceptedAt ? 'accepted' : 'waiting'} · Receiver: {activeChallenge.acceptance.receiverAcceptedAt ? 'accepted' : 'waiting'}</Text>
-      {CONFIG_FIELDS.map(({ field, label }) => <View key={field} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={styles.body}>{label}: {config[field]}</Text>
-        {!activeChallenge.locked && <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Action title="−" onPress={() => changeConfig(field, -1)} />
-          <Action title="+" onPress={() => changeConfig(field, 1)} />
-        </View>}
-      </View>)}
-      <Text style={styles.body}>{activeChallenge.locked ? 'Workout settings locked' : activeChallenge.status === 'ready' ? 'Both players ready' : 'Waiting for the other player'}</Text>
-      {activeChallenge.status === 'configuring' && !activeChallenge.acceptance.senderAcceptedAt && !activeChallenge.acceptance.receiverAcceptedAt && <Text style={styles.body}>Configuration changed; acceptance reset.</Text>}
-      {(activeChallenge.status === 'accepted' || activeChallenge.status === 'configuring') && <Action title="Accept configuration" onPress={() => mutate((demoUser) => acceptChallengeConfig(demoUser.userId, activeChallenge.challengeId))} />}
-      {activeChallenge.status === 'ready' && <Action title="Start workout" onPress={() => mutate((demoUser) => startChallenge(demoUser.userId, activeChallenge.challengeId))} />}
-      {activeChallenge.status === 'active' && <>
-        <Text style={styles.body}>Workout active — camera session launched.</Text>
-        {launchedChallengeIds.has(activeChallenge.challengeId) && <Action title="Return to workout" onPress={() => rejoinWorkout(activeChallenge)} />}
-      </>}
+    {outgoing.length > 0 && <Card>
+      <Text style={[typography.bodyLg, { color: colors.text, fontWeight: '900' }]}>Sent challenges</Text>
+      {outgoing.map((challenge) => <PlayerRow key={challenge.challengeId} name={challenge.receiverDisplayName} detail={user && challenge.status === 'pending' ? OPPONENT_STATUS_COPY[opponentStatusFromChallenge(challenge, user.userId)].label : undefined} trailing={<Pill label={CHALLENGE_STATUS_VISUALS[challenge.status].label} tone={CHALLENGE_STATUS_VISUALS[challenge.status].tone} />} />)}
     </Card>}
+
+    {!list.loading && !list.loadError && incoming.length === 0 && outgoing.length === 0 && !activeChallenge && <Text style={[styles.body, { textAlign: 'center' }]}>No challenges yet. Challenge a nearby player to get started.</Text>}
   </View>;
 }

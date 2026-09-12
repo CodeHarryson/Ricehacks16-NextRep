@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { PoseFrame } from '../../contracts/pose';
+import { quality } from '../../theme/tokens';
 
 const FACE_LANDMARKS: readonly number[] = [0, 2, 5, 7, 8];
 
@@ -53,7 +54,7 @@ export function PoseOverlay({ frame, width, height, mirrored, visible }: {
 const overlayStyles = StyleSheet.create({
   focusGuide: {
     position: 'absolute',
-    borderColor: '#B5ED80', borderWidth: 3, borderRadius: 999,
+    borderColor: quality.green, borderWidth: 3, borderRadius: 999,
   },
   guideText: {
     position: 'absolute', top: 8, alignSelf: 'center', color: '#FFFFFF',
@@ -61,6 +62,6 @@ const overlayStyles = StyleSheet.create({
     borderRadius: 8, fontSize: 11, fontWeight: '700',
   },
   dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: '#06110A' },
-  visibleDot: { backgroundColor: '#39E06F' },
-  hiddenDot: { backgroundColor: '#FF625F' },
+  visibleDot: { backgroundColor: quality.green },
+  hiddenDot: { backgroundColor: quality.red },
 });

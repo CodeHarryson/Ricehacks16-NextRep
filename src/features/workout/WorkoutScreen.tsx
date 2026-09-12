@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Action, Card, styles } from '../../components/ui';
+import { Action, Card, ScreenHeader, styles } from '../../components/ui';
+import { Banner, Collapsible } from '../../components/display';
+import { colors, typography, type Tone } from '../../theme/tokens';
 import { SESSION_COUNTDOWN_SECONDS, WORKOUT_COMPLETION_REWARD } from '../../config/workout';
 import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
@@ -18,6 +20,7 @@ import { buildChallengeResultView } from '../challenge/resultView';
 import { useChallengeProgress } from '../challenge/useChallengeProgress';
 import { CountdownCard } from './components/CountdownCard';
 import { SessionConfigCard } from './components/SessionConfigCard';
+import { CameraFrame, RepCounter, RestTimerCard, ScoreSummaryCard, WorkoutHud } from './components/WorkoutParts';
 import { acceptAttempt, createWorkoutState, setRewardStatus, type SetCompleted, type WorkoutState } from './controller';
 import { countdownMessage, countdownView } from './countdown';
 import { DEFAULT_SOLO_SESSION, isValidWorkoutSession, type WorkoutSessionConfig } from './session';
@@ -235,36 +238,40 @@ export function WorkoutScreen({ session, onExit }: { session?: WorkoutSessionCon
   const showResultPanel = isChallenge && (resultStatus === 'submitted' || serverHasResult || isFinalResolution(snapshot));
   const resultView = showResultPanel ? buildChallengeResultView({ userId: challenge.userId, results: snapshot?.results ?? [], resolution: snapshot?.resolution ?? { status: 'pending' }, localScore: challengeResult, opponentName: view.opponentName ?? undefined }) : null;
   const sessionPhase = timeExpired ? 'expired' : workoutState.status === 'complete' || showResultPanel ? 'completed' : resting ? 'rest' : sessionStarted ? 'active' : 'countdown';
-  return <View style={{ gap: 20 }}>
-    <Text style={styles.eyebrow}>{view.eyebrow}</Text>
-    <Text style={styles.title}>Find your space.</Text>
-    <SessionConfigCard view={view} setCount={sessionConfig.setCount} currentSet={currentSet} completedSets={completedSets} />
-    {challenge.identityError && <Card><Text style={styles.heading}>Challenge unavailable</Text><Text style={styles.body}>{challenge.identityError}</Text></Card>}
-    {view.showOpponentStatus && !showResultPanel && <OpponentStatusCard opponentName={view.opponentName} status={challenge.opponentStatus} error={challenge.poll.error} onRetry={challenge.retryPolling} />}
-    {(sessionPhase === 'countdown' || sessionPhase === 'active' || (sessionPhase === 'expired' && !showResultPanel)) && <CountdownCard view={countdown} message={countdownMessage(countdown, isChallenge, view.opponentName ?? undefined)} />}
-    {sessionPhase === 'rest' && <Card><Text style={styles.heading}>Rest before set {currentSet}</Text><Text style={styles.body}>Next set in {restRemaining}s</Text></Card>}
+  const phaseVisual: Record<typeof sessionPhase, { label: string; tone: Tone }> = { countdown: { label: 'Countdown', tone: 'info' }, active: { label: 'Tracking reps', tone: 'success' }, rest: { label: 'Resting', tone: 'info' }, completed: { label: 'Complete', tone: 'success' }, expired: { label: 'Time expired', tone: 'danger' } };
+  const soloRewardMessage = workoutState.rewardStatus === 'granted' ? ` — ${WORKOUT_COMPLETION_REWARD.xp} XP and +${WORKOUT_COMPLETION_REWARD.overallRatingDelta} OVR saved locally.` : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…';
+  return <View style={{ gap: 16 }}>
+    <WorkoutHud setCount={sessionConfig.setCount} currentSet={currentSet} completedSets={completedSets} secondsRemaining={sessionPhase === 'active' ? countdown.secondsRemaining : null} phaseLabel={phaseVisual[sessionPhase].label} phaseTone={phaseVisual[sessionPhase].tone} />
+    <ScreenHeader eyebrow={view.eyebrow} title="Find your space." />
+    {challenge.identityError && <Banner tone="danger" title="Challenge unavailable" message={challenge.identityError} />}
     {resultView && <ChallengeResultPanel view={resultView} pollError={challenge.poll.error} rewardStatus={challenge.rewardStatus} onRetryPolling={challenge.retryPolling} onRetryReward={challenge.retryReward} onReturnToMap={onExit} />}
-    {sessionStarted && !timeExpired && !resting && !showResultPanel && <><Text style={styles.body}>{faceLocked ? 'Step back until your full body and feet fit in view, then turn sideways.' : 'First, center your face in the camera oval and hold still to activate this workout.'}</Text><CameraPreview faceStartActive={!faceLocked} onFrame={onFrame} onTracking={onTracking} /></>}
+    {(sessionPhase === 'countdown' || (sessionPhase === 'active' && isChallenge && countdown.skippedCountdown) || (sessionPhase === 'expired' && !showResultPanel)) && <CountdownCard view={countdown} message={countdownMessage(countdown, isChallenge, view.opponentName ?? undefined)} />}
+    {view.showOpponentStatus && !showResultPanel && <OpponentStatusCard opponentName={view.opponentName} status={challenge.opponentStatus} error={challenge.poll.error} onRetry={challenge.retryPolling} />}
+    {sessionPhase === 'rest' && <RestTimerCard nextSet={currentSet} secondsLeft={restRemaining} />}
+    {!showResultPanel && <SessionConfigCard view={view} />}
+    {sessionStarted && !timeExpired && !resting && !showResultPanel && <CameraFrame instruction={faceLocked ? 'Step back until your full body and feet fit in view, then turn sideways.' : 'First, center your face in the camera oval and hold still to activate this workout.'}><CameraPreview faceStartActive={!faceLocked} onFrame={onFrame} onTracking={onTracking} /></CameraFrame>}
     <Card>
-      <Text accessibilityLiveRegion="polite" style={styles.heading}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
-      <Text style={styles.body}>Face start: {faceLocked ? 'confirmed' : `${faceProgress}/${FACE_START_HOLD_FRAMES}`}</Text>
-      <Text style={styles.body}>Visible side: {selectedSide.current ?? 'not selected yet'}</Text>
-      <Text style={styles.body}>Phase: {phase}</Text>
-      <Text style={styles.body}>Movement range: {measurement ? `${measurement.rangeFromStandingDeg.toFixed(1)}°` : '—'} (minimum {DEFAULT_RUBRIC.minimumRangeDeg}°)</Text>
-      <Text style={styles.body}>Tracking detail: {trackingDetail}</Text>
-      <Text style={styles.heading}>Reps: {workoutState.reps}/{workoutState.targetReps}</Text>
-      {timeExpired && <Text style={styles.heading} accessibilityLiveRegion="polite">Time expired — reps counted before the deadline are preserved.</Text>}
-      {resultStatus === 'saving' && <Text style={styles.heading}>Calculating score…</Text>}
-      {resultStatus === 'saved' && <Text style={styles.heading}>Score saved locally.</Text>}
-      {resultStatus === 'submission_pending' && <Text style={styles.heading}>Submitting challenge result…</Text>}
-      {resultStatus === 'submitted' && <Text style={styles.heading}>Challenge result submitted.</Text>}
-      {serverHasResult && resultStatus !== 'submitted' && <Text style={styles.heading}>Challenge result already confirmed by the server.</Text>}
-      {challengeResult && !showResultPanel && <Card><Text style={styles.heading}>{isChallenge ? 'Challenge score' : 'Solo score'}</Text><Text style={styles.body}>{challengeResult.totalScore} points · {challengeResult.countedReps}/{challengeResult.cappedTargetReps} counted reps · {challengeResult.greenReps} green · {challengeResult.yellowReps} yellow</Text><Text style={styles.body}>Policy: {SCORE_POLICY_VERSION}{isChallenge ? ' · Local score is being prepared.' : ''}</Text></Card>}
-      {resultError && !serverHasResult && !isFinalResolution(snapshot) && <Card><Text style={styles.body}>Result save failed: {resultError}</Text><Action title="Retry result save" onPress={() => { void finalizeSessionResult(workoutState.status === 'complete', completion.current); }} /></Card>}
-      <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
-      <Text style={styles.body}>{workoutState.lastAttempt ? `Latest attempt: ${workoutState.lastAttempt.rating ?? 'neutral'} — ${workoutState.lastAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
-      {workoutState.status === 'complete' && <Text style={styles.heading} accessibilityLiveRegion="polite">Set complete{sessionConfig.mode === 'challenge' ? resultStatus === 'submitted' || serverHasResult ? ' — challenge result submitted.' : ' — local score is being prepared.' : workoutState.rewardStatus === 'granted' ? ` — ${WORKOUT_COMPLETION_REWARD.xp} XP and +${WORKOUT_COMPLETION_REWARD.overallRatingDelta} OVR saved locally.` : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…'}</Text>}
-      {workoutState.rewardStatus === 'failed' && <Action title="Retry reward save" onPress={retryReward} />}
+      <Text accessibilityLiveRegion="polite" style={[typography.bodyLg, { color: neutral ? colors.textSecondary : colors.text, fontWeight: '900' }]}>{neutral ? `Neutral: ${tracking.status === 'tracking' ? analysisGuidance : tracking.guidance}` : analysisGuidance}</Text>
+      <RepCounter reps={workoutState.reps} targetReps={workoutState.targetReps} lastRating={workoutState.lastAttempt ? workoutState.lastAttempt.rating : undefined} lastReason={workoutState.lastAttempt?.reason ?? null} />
+      {timeExpired && <Banner tone="warning" title="Time expired — reps counted before the deadline are preserved." live />}
+      {resultStatus === 'saving' && <Banner tone="info" title="Calculating score…" live />}
+      {resultStatus === 'saved' && <Banner tone="info" title="Score saved locally." live />}
+      {resultStatus === 'submission_pending' && <Banner tone="info" title="Submitting challenge result…" live />}
+      {resultStatus === 'submitted' && <Banner tone="success" title="Challenge result submitted." live />}
+      {serverHasResult && resultStatus !== 'submitted' && <Banner tone="success" title="Challenge result already confirmed by the server." />}
+      {challengeResult && !showResultPanel && <ScoreSummaryCard title={isChallenge ? 'Challenge score' : 'Solo score'} score={challengeResult} note={`Policy: ${SCORE_POLICY_VERSION}${isChallenge ? ' · Local score is being prepared.' : ''}`} />}
+      {resultError && !serverHasResult && !isFinalResolution(snapshot) && <Banner tone="danger" title="Result save failed" message={resultError} live><Action title="Retry result save" variant="secondary" onPress={() => { void finalizeSessionResult(workoutState.status === 'complete', completion.current); }} /></Banner>}
+      {workoutState.status === 'complete' && <Banner tone={!isChallenge && workoutState.rewardStatus === 'failed' ? 'danger' : 'success'} title={`Set complete${isChallenge ? resultStatus === 'submitted' || serverHasResult ? ' — challenge result submitted.' : ' — local score is being prepared.' : soloRewardMessage}`} live>
+        {workoutState.rewardStatus === 'failed' && <Action title="Retry reward save" variant="secondary" onPress={retryReward} />}
+      </Banner>}
+      <Collapsible title="Tracking details">
+        <Text style={styles.body}>Face start: {faceLocked ? 'confirmed' : `${faceProgress}/${FACE_START_HOLD_FRAMES}`}</Text>
+        <Text style={styles.body}>Visible side: {selectedSide.current ?? 'not selected yet'}</Text>
+        <Text style={styles.body}>Phase: {phase}</Text>
+        <Text style={styles.body}>Movement range: {measurement ? `${measurement.rangeFromStandingDeg.toFixed(1)}°` : '—'} (minimum {DEFAULT_RUBRIC.minimumRangeDeg}°)</Text>
+        <Text style={styles.body}>Tracking detail: {trackingDetail}</Text>
+        <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
+      </Collapsible>
     </Card>
   </View>;
 }
