@@ -1,0 +1,18 @@
+diff --git a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
+index 91523e8..ab0fa68 100644
+--- a/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
++++ b/node_modules/react-native-mediapipe/android/src/main/java/com/reactnativemediapipe/shared/ConvertHelpers.kt
+@@ -13,6 +13,8 @@ fun normalizedLandmarkToWritableMap(landmark: NormalizedLandmark): WritableMap {
+   map.putDouble("x", landmark.x().toDouble())
+   map.putDouble("y", landmark.y().toDouble())
+   map.putDouble("z", landmark.z().toDouble())
++  landmark.visibility().ifPresent { map.putDouble("visibility", it.toDouble()) }
++  landmark.presence().ifPresent { map.putDouble("presence", it.toDouble()) }
+   return map
+ }
+ 
+@@ -47,4 +49,3 @@ fun orientationToDegrees(orientation: Orientation): Int =
+     Orientation.LANDSCAPE_RIGHT -> -90
+   }
+ 
+-

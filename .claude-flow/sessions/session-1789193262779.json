@@ -1,0 +1,15 @@
+{
+  "id": "session-1789193262779",
+  "startedAt": "2026-09-12T06:07:42.779Z",
+  "cwd": "/Users/codeharryson/Documents/Ricehacks16-NextRep",
+  "context": {},
+  "metrics": {
+    "edits": 16,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "restoredAt": "2026-09-12T08:07:31.194Z",
+  "endedAt": "2026-09-12T08:08:02.304Z",
+  "duration": 7219526
+}

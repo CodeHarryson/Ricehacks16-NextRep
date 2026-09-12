@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { withDangerousMod, withXcodeProject, IOSConfig } = require('@expo/config-plugins');
+const { withDangerousMod, withXcodeProject, withPodfile, IOSConfig } = require('@expo/config-plugins');
 
 const MODEL = 'pose_landmarker_lite.task';
 
@@ -9,7 +9,7 @@ function copyModel(config, platform) {
     const source = path.join(modConfig.modRequest.projectRoot, 'assets', MODEL);
     const destination = platform === 'android'
       ? path.join(modConfig.modRequest.platformProjectRoot, 'app', 'src', 'main', 'assets', MODEL)
-      : path.join(modConfig.modRequest.platformProjectRoot, modConfig.modRequest.projectName, MODEL);
+      : path.join(modConfig.modRequest.platformProjectRoot, MODEL);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(source, destination);
     return modConfig;
@@ -19,6 +19,13 @@ function copyModel(config, platform) {
 module.exports = function withPoseLandmarkerModel(config) {
   config = copyModel(config, 'android');
   config = copyModel(config, 'ios');
+  config = withPodfile(config, (modConfig) => {
+    const marker = '# NextRep deployment target normalization';
+    if (!modConfig.modResults.contents.includes(marker)) {
+      modConfig.modResults.contents = modConfig.modResults.contents.replace(/\n  end\nend\s*$/, `\n\n    ${marker}\n    installer.pods_project.targets.each do |target|\n      target.build_configurations.each do |build_config|\n        build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'\n      end\n    end\n  end\nend\n`);
+    }
+    return modConfig;
+  });
   return withXcodeProject(config, (modConfig) => {
     const project = modConfig.modResults;
     const target = IOSConfig.XcodeUtils.getApplicationNativeTarget({ project, projectName: modConfig.modRequest.projectName });

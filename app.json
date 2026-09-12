@@ -6,12 +6,38 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
-    "ios": { "bundleIdentifier": "com.nextrep.hackrice", "supportsTablet": false },
-    "android": { "package": "com.nextrep.hackrice", "blockedPermissions": ["android.permission.RECORD_AUDIO"] },
+    "ios": {
+      "bundleIdentifier": "com.nextrep.hackrice",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "NextRep uses your camera for on-device workout tracking.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.nextrep.hackrice",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
     "plugins": [
       "expo-dev-client",
       "./plugins/withPoseLandmarkerModel",
-      ["react-native-vision-camera", { "cameraPermissionText": "NextRep uses your camera for on-device workout tracking.", "enableMicrophonePermission": false }]
-    ]
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "NextRep uses your camera for on-device workout tracking.",
+          "enableMicrophonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "37d86985-9b19-4919-9a18-06682cfa566a"
+      }
+    }
   }
 }

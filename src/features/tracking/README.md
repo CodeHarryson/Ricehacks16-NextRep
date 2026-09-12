@@ -22,6 +22,34 @@ Required native permissions are camera only: iOS `NSCameraUsageDescription` and
 Android `android.permission.CAMERA`. Build with `npx expo prebuild --no-install`,
 then `npm run ios` or `npm run android` on a signed physical development client.
 
+The camera must report its device and `cover` resize mode to the MediaPipe hook and
+request VisionCamera's `rgb` pixel format, matching the installed package's camera
+wrapper. The Android 0.6.0 bridge omits MediaPipe visibility and presence values by
+default; `patches/react-native-mediapipe+0.6.0.patch` preserves those detector values
+without inventing replacements. `patch-package` reapplies this after installation.
+
+During setup, NextRep compares detector-supplied visibility for the left and right
+shoulder, hip, knee, and ankle. It selects the usable side with the higher total and
+holds that anatomical side for the analyzer session. Until one side is usable, the
+screen stays neutral and asks the user to step back. Analyzer rejection reasons are
+translated into neutral framing/reacquisition guidance; they never become red reps.
+
+## Comparison reference
+
+The Android comparison app at
+<https://github.com/Deiahri/HackRiceAndroidCVApp> was inspected at commit
+`b0fd4010f1f31ac453bad3429b9b41d1344c743f` (2026-09-12). Its checked-in mobile
+and native-module license files contain the MIT license with Expo's template
+copyright notice. No source was copied. We independently adopted the general
+integration patterns of explicit frame format, newest-frame processing, visible-side
+selection, and visible placement status.
+
+That app drives squat counting with the internal hip-knee-ankle angle. NextRep keeps
+its documented thigh inclination relative to image vertical, standing calibration,
+time-based persistence, interruption handling, and attempt results. Therefore none
+of the comparison app's angle thresholds, form scores, or medical-sounding cues were
+transferred.
+
 ## Future MediaPipe/native interface
 
 The adapter must continue to emit normalized upright `PoseFrame` values with image
