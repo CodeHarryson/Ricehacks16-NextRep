@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN } from './config.js';
+import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN, RESULT_MAX_FUTURE_SKEW_SECONDS, SESSION_COUNTDOWN_SECONDS } from './config.js';
 import { pool, type DbClient } from './db.js';
 import { quantizeCoordinate, validatePresence, type PresenceInput } from './validation.js';
 
@@ -242,8 +242,9 @@ export function createApp(db: DbClient = pool): Hono {
     const numbers = ['configVersion', 'greenReps', 'yellowReps', 'redAttempts', 'neutralAttempts'].map((key) => raw[key]);
     if (raw.exercise !== challenge.exercise || !numbers.every((value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) || raw.configVersion !== challenge.config_version) return context.json({ error: 'result does not match the locked configuration' }, 400);
     const green = raw.greenReps as number; const yellow = raw.yellowReps as number; const counted = Math.min(challenge.set_count * challenge.target_reps, green + yellow); const cappedGreen = Math.min(green, counted); const cappedYellow = Math.min(yellow, counted - cappedGreen);
-    const startedAt = typeof raw.startedAt === 'string' ? new Date(raw.startedAt) : new Date(Number.NaN); const endedAt = typeof raw.endedAt === 'string' ? new Date(raw.endedAt) : new Date(Number.NaN);
-    if (!Number.isFinite(startedAt.getTime()) || !Number.isFinite(endedAt.getTime()) || endedAt < startedAt) return context.json({ error: 'invalid result timestamps' }, 400);
+    const startedAtText = typeof raw.startedAt === 'string' ? raw.startedAt : ''; const endedAtText = typeof raw.endedAt === 'string' ? raw.endedAt : '';
+    const startedAt = new Date(startedAtText); const endedAt = new Date(endedAtText); const serverStart = challenge.started_at ? new Date(challenge.started_at) : new Date(Number.NaN); const deadline = new Date(serverStart.getTime() + (SESSION_COUNTDOWN_SECONDS + challenge.match_time_limit_seconds) * 1000);
+    if (!startedAtText || !endedAtText || !Number.isFinite(startedAt.getTime()) || !Number.isFinite(endedAt.getTime()) || !Number.isFinite(serverStart.getTime()) || endedAt < startedAt || startedAt < serverStart || endedAt > deadline || endedAt.getTime() > Date.now() + RESULT_MAX_FUTURE_SKEW_SECONDS * 1000) return context.json({ error: 'result timestamps are outside the challenge window' }, 400);
     await db.query(`INSERT INTO challenge_participant_results (result_id, challenge_id, participant_id, config_version, exercise, counted_reps, green_reps, yellow_reps, red_attempts, neutral_attempts, total_score, score_policy_version, started_at, ended_at, idempotency_key) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'score-v1',$12::timestamptz,$13::timestamptz,$14) ON CONFLICT DO NOTHING`, [randomUUID(), challenge.challenge_id, participantId, challenge.config_version, challenge.exercise, counted, cappedGreen, cappedYellow, raw.redAttempts, raw.neutralAttempts, cappedGreen * 110 + cappedYellow * 100, startedAt.toISOString(), endedAt.toISOString(), idempotencyKey]);
     const inserted = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2', [challenge.challenge_id, participantId]);
     const result = inserted.rows[0]; if (!result) return context.json({ error: 'result submission failed' }, 500);

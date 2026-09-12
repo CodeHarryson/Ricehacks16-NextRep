@@ -137,7 +137,7 @@ test('shared configuration validates, resets acceptance, reaches ready, and star
 });
 
 test('challenge result submission recalculates score and is retry-safe', async () => {
-  const challenge = challengeRow({ status: 'active', config_version: 2, exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, expires_at: new Date(Date.now() + 60_000) });
+  const challenge = challengeRow({ status: 'active', config_version: 2, exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, started_at: new Date(Date.now() - 20_000), expires_at: new Date(Date.now() + 60_000) });
   const stored = { result_id: 'r1', challenge_id: 'c1', participant_id: 'sender', config_version: 2, exercise: 'bodyweight_squat', counted_reps: 2, green_reps: 1, yellow_reps: 1, red_attempts: 1, neutral_attempts: 1, total_score: 210, score_policy_version: 'score-v1', started_at: new Date(1), ended_at: new Date(2), submitted_at: new Date(3), idempotency_key: 'k1' };
   let inserted = false;
   const db = { query: async <T>(sql: string) => {
@@ -148,9 +148,20 @@ test('challenge result submission recalculates score and is retry-safe', async (
     return { rows: [], rowCount: 0 };
   } };
   const app = createApp(db);
-  const request = { configVersion: 2, exercise: 'bodyweight_squat', countedReps: 99, greenReps: 1, yellowReps: 1, redAttempts: 1, neutralAttempts: 1, totalScore: 9999, startedAt: new Date(1).toISOString(), endedAt: new Date(2).toISOString(), idempotencyKey: 'k1' };
+  const request = { configVersion: 2, exercise: 'bodyweight_squat', countedReps: 99, greenReps: 1, yellowReps: 1, redAttempts: 1, neutralAttempts: 1, totalScore: 9999, startedAt: new Date(Date.now() - 10_000).toISOString(), endedAt: new Date(Date.now() - 1_000).toISOString(), idempotencyKey: 'k1' };
   const first = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'k1' }, body: JSON.stringify(request) });
   assert.equal(first.status, 201); assert.equal((await first.json()).result.totalScore, 210);
   const retry = await app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'k1' }, body: JSON.stringify(request) });
   assert.equal(retry.status, 200);
+});
+
+test('challenge result timestamps are bounded by the shared server window', async () => {
+  const startedAt = new Date(Date.now() - 20_000);
+  const challenge = challengeRow({ status: 'active', config_version: 1, exercise: 'bodyweight_squat', set_count: 1, target_reps: 5, started_at: startedAt, match_time_limit_seconds: 30, expires_at: new Date(Date.now() + 60_000) });
+  const db = { query: async <T>(sql: string) => sql.includes('SELECT * FROM challenges') ? { rows: [challenge as T], rowCount: 1 } : { rows: [], rowCount: 0 } };
+  const app = createApp(db); const base = { configVersion: 1, exercise: 'bodyweight_squat', greenReps: 1, yellowReps: 0, redAttempts: 0, neutralAttempts: 0, idempotencyKey: 'window' };
+  const send = (start: Date, end: Date) => app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': 'sender', 'x-idempotency-key': 'window' }, body: JSON.stringify({ ...base, startedAt: start.toISOString(), endedAt: end.toISOString() }) });
+  assert.equal((await send(new Date(startedAt.getTime() - 1), new Date(startedAt.getTime() + 1000))).status, 400);
+  assert.equal((await send(new Date(startedAt.getTime() + 11_000), new Date(startedAt.getTime() + 41_000))).status, 400);
+  assert.equal((await send(new Date(startedAt.getTime() + 11_000), new Date(startedAt.getTime() + 10_000))).status, 400);
 });

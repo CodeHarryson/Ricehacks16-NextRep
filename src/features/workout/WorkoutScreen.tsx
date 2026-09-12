@@ -77,6 +77,9 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   const [resultError, setResultError] = useState<string | null>(null);
   const [opponentResult, setOpponentResult] = useState<ChallengeResult | null>(null);
   const [resolution, setResolution] = useState<ChallengeResolution>({ status: 'pending' });
+  type ResultStatus = 'not_started' | 'saving' | 'saved' | 'submission_pending' | 'submitted' | 'failed';
+  const [resultStatus, setResultStatus] = useState<ResultStatus>('not_started');
+  const finalizationInFlight = useRef(false);
   useEffect(() => {
     if (!validSession) return;
     const timer = setInterval(() => { const next = advanceSessionClock(clock.current, Date.now()); clock.current = next; setClockState(next); }, 250);
@@ -117,6 +120,24 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
       rewardInFlight.current = false;
     }
   }, []);
+  const finalizeSessionResult = useCallback(async (completedFully: boolean, completionEvent: SetCompleted | null) => {
+    if (finalizationInFlight.current || resultStatus === 'submitted') return;
+    finalizationInFlight.current = true; setResultStatus('saving'); setResultError(null);
+    const performanceId = `performance:${workout.current.sessionId}`;
+    const startedAt = new Date(clock.current.countdownEndsAt).toISOString(); const endedAt = new Date(Math.min(Date.now(), clock.current.deadline)).toISOString();
+    try {
+      const score = scoreAttempts(sessionAttempts.current, sessionConfig.setCount * sessionConfig.targetReps); setChallengeResult(score);
+      await saveWorkoutPerformance({ performanceId, workoutId: performanceId, mode: sessionConfig.mode, exercise: sessionConfig.exercise, setCount: sessionConfig.setCount, targetReps: sessionConfig.targetReps, matchDurationSeconds: sessionConfig.matchTimeLimitSeconds, startedAt, endedAt, ...score });
+      setResultStatus('saved');
+      if (sessionConfig.mode === 'challenge' && sessionConfig.challengeId) {
+        setResultStatus('submission_pending'); const user = await loadDemoUser();
+        await submitChallengeResult(user.userId, sessionConfig.challengeId, { configVersion: sessionConfig.configVersion ?? 1, exercise: sessionConfig.exercise, greenReps: score.greenReps, yellowReps: score.yellowReps, redAttempts: score.redAttempts, neutralAttempts: score.neutralAttempts, startedAt, endedAt, idempotencyKey: performanceId });
+        resultSubmitted.current = true; setResultStatus('submitted');
+      } else if (completedFully && completionEvent) await persistCompletion(completionEvent, sessionAttemptKeys.current);
+    } catch (caught) { setResultError(caught instanceof Error ? caught.message : 'Could not save workout result.'); setResultStatus('failed'); }
+    finally { finalizationInFlight.current = false; }
+  }, [persistCompletion, resultStatus, sessionConfig.challengeId, sessionConfig.configVersion, sessionConfig.exercise, sessionConfig.matchTimeLimitSeconds, sessionConfig.mode, sessionConfig.setCount, sessionConfig.targetReps]);
+  useEffect(() => { if (timeExpired && resultStatus === 'not_started') void finalizeSessionResult(false, null); }, [finalizeSessionResult, resultStatus, timeExpired]);
   const consumeAttempts = useCallback((attempts: readonly AttemptResult[]) => {
     for (const attempt of attempts) {
       if (resting || !canAcceptSessionAttempt(clock.current, attempt.endedAt)) continue;
@@ -133,18 +154,11 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
           workout.current = createWorkoutState(workout.current.sessionId, `squat-set-${workout.current.sessionId}-${currentSet + 1}`, sessionConfig.targetReps); setWorkoutState(workout.current); analyzer.current = null; selectedSide.current = null; setPhase('CALIBRATING');
         } else {
           setCompletedSets(sessionConfig.setCount);
-          const score = scoreAttempts(sessionAttempts.current, sessionConfig.setCount * sessionConfig.targetReps); setChallengeResult(score);
-          const finish = async () => {
-            const performanceId = `performance:${workout.current.sessionId}`; const startedAt = new Date(clock.current.countdownEndsAt).toISOString(); const endedAt = new Date().toISOString();
-            await saveWorkoutPerformance({ performanceId, workoutId: performanceId, userId: undefined, mode: sessionConfig.mode, exercise: sessionConfig.exercise, setCount: sessionConfig.setCount, targetReps: sessionConfig.targetReps, matchDurationSeconds: sessionConfig.matchTimeLimitSeconds, startedAt, endedAt, ...score });
-            if (sessionConfig.mode === 'challenge' && sessionConfig.challengeId && !resultSubmitted.current) { resultSubmitted.current = true; const user = await loadDemoUser(); await submitChallengeResult(user.userId, sessionConfig.challengeId, { configVersion: sessionConfig.configVersion ?? 1, exercise: sessionConfig.exercise, greenReps: score.greenReps, yellowReps: score.yellowReps, redAttempts: score.redAttempts, neutralAttempts: score.neutralAttempts, startedAt, endedAt, idempotencyKey: performanceId }); }
-            if (sessionConfig.mode === 'solo') await persistCompletion(accepted.completion!, sessionAttemptKeys.current);
-          };
-          void finish().catch((caught) => setResultError(caught instanceof Error ? caught.message : 'Could not save workout result.'));
+          void finalizeSessionResult(true, accepted.completion);
         }
       }
     }
-  }, [currentSet, persistCompletion, resting, sessionConfig.challengeId, sessionConfig.configVersion, sessionConfig.exercise, sessionConfig.matchTimeLimitSeconds, sessionConfig.mode, sessionConfig.restSeconds, sessionConfig.setCount, sessionConfig.targetReps]);
+  }, [currentSet, finalizeSessionResult, resting, sessionConfig.restSeconds, sessionConfig.setCount, sessionConfig.targetReps]);
   const onFrame = useCallback((frame: PoseFrame) => {
     if (resting || !canAcceptSessionAttempt(clock.current, Date.now()) || workout.current.status === 'complete') return;
     if (!faceLockedRef.current) {
@@ -225,9 +239,13 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
       <Text style={styles.heading}>Reps: {workoutState.reps}/{workoutState.targetReps}</Text>
       <Text style={styles.body}>Configuration: {sessionConfig.setCount} set · {sessionConfig.targetReps} reps · {sessionConfig.restSeconds}s rest{sessionConfig.mode === 'challenge' ? ` · challenge ${sessionConfig.challengeId}` : ''}</Text>
       {timeExpired && <Text style={styles.heading} accessibilityLiveRegion="polite">Time expired — reps counted before the deadline are preserved.</Text>}
-      {challengeResult && <Card><Text style={styles.heading}>{sessionConfig.mode === 'challenge' ? 'Challenge score submitted' : 'Solo score'}</Text><Text style={styles.body}>{challengeResult.totalScore} points · {challengeResult.countedReps}/{challengeResult.cappedTargetReps} counted reps · {challengeResult.greenReps} green · {challengeResult.yellowReps} yellow</Text><Text style={styles.body}>Policy: {SCORE_POLICY_VERSION}{sessionConfig.mode === 'challenge' ? ' · Server resolution pending.' : ''}</Text></Card>}
-      {sessionConfig.mode === 'challenge' && challengeResult && <Card><Text style={styles.heading}>{opponentResult ? `Opponent score: ${opponentResult.totalScore}` : 'Waiting for opponent result…'}</Text>{resolution.status === 'resolved' && <Text style={styles.body}>{resolution.winnerId === null ? 'Draw.' : 'Winner resolved by server.'}</Text>}</Card>}
-      {resultError && <Text style={styles.body}>Result save error: {resultError}</Text>}
+      {resultStatus === 'saving' && <Text style={styles.heading}>Calculating score…</Text>}
+      {resultStatus === 'saved' && <Text style={styles.heading}>Score saved locally.</Text>}
+      {resultStatus === 'submission_pending' && <Text style={styles.heading}>Submitting challenge result…</Text>}
+      {resultStatus === 'submitted' && <Text style={styles.heading}>Challenge result submitted.</Text>}
+      {challengeResult && <Card><Text style={styles.heading}>{sessionConfig.mode === 'challenge' ? 'Challenge score' : 'Solo score'}</Text><Text style={styles.body}>{challengeResult.totalScore} points · {challengeResult.countedReps}/{challengeResult.cappedTargetReps} counted reps · {challengeResult.greenReps} green · {challengeResult.yellowReps} yellow</Text><Text style={styles.body}>Policy: {SCORE_POLICY_VERSION}{sessionConfig.mode === 'challenge' ? ' · Server resolution pending.' : ''}</Text></Card>}
+      {sessionConfig.mode === 'challenge' && resultStatus === 'submitted' && <Card><Text style={styles.heading}>{opponentResult ? `Opponent score: ${opponentResult.totalScore}` : 'Waiting for opponent result…'}</Text>{resolution.status === 'resolved' && <Text style={styles.body}>{resolution.winnerId === null ? 'Draw.' : 'Winner resolved by server.'}</Text>}</Card>}
+      {resultError && <Card><Text style={styles.body}>Result save failed: {resultError}</Text><Action title="Retry result save" onPress={() => { void finalizeSessionResult(workoutState.status === 'complete', completion.current); }} /></Card>}
       <Text style={styles.body}>Session phase: {sessionPhase} · Set status: {workoutState.status === 'complete' ? 'complete' : 'active'} · Reward: {workoutState.rewardStatus}</Text>
       <Text style={styles.body}>{workoutState.lastAttempt ? `Latest attempt: ${workoutState.lastAttempt.rating ?? 'neutral'} — ${workoutState.lastAttempt.reason}` : 'Complete a full side-view squat to receive an attempt result.'}</Text>
       {workoutState.status === 'complete' && <Text style={styles.heading} accessibilityLiveRegion="polite">Set complete{sessionConfig.mode === 'challenge' ? ' — challenge results are not synchronized yet.' : workoutState.rewardStatus === 'granted' ? ` — ${WORKOUT_COMPLETION_REWARD.xp} XP and +${WORKOUT_COMPLETION_REWARD.overallRatingDelta} OVR saved locally.` : workoutState.rewardStatus === 'failed' ? ' — reward save failed; repeat delivery can retry safely.' : ' — saving reward…'}</Text>}

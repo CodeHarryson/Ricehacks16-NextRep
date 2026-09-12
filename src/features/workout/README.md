@@ -8,9 +8,13 @@ Controller/storage owner: controller.ts and progression. The controller owns sta
 session/set IDs, five-rep capped totals, attempt-key and attempt-ID deduplication,
 and the one-time completion event. WorkoutScreen sends every completed analyzer
 attempt to it; continuous frames and tracking updates never receive rewards.
-Challenge-aware camera navigation and the countdown/deadline boundary are
-implemented, but challenge sessions still track reps locally on each device.
-Battle scoring, synchronized results, and performance persistence are planned.
+Challenge-aware camera navigation, synchronized countdown/deadline sessions,
+multi-set accounting, rest periods, `score-v1` scoring, and result finalization
+for both completed and timed-out sessions are implemented. Solo performance
+records are persisted locally; challenge results are server-validated and
+idempotently submitted. Battle rewards, advanced leaderboards, and richer
+performance synchronization remain planned. Demo header identity is not
+production authentication.
 
 Progression serializes AsyncStorage read-modify-write operations. A completed set
 uses deterministic completion/reward IDs and saves XP, OVR, coins, completed-workout
