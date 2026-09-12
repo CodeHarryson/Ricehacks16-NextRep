@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PoseFrame, PoseLandmark } from '../../contracts/pose';
-import { normalizePoseResult, selectVisibleSide } from './poseAdapter';
+import { normalizePoseResult, orientLandmarksUpright, selectVisibleSide, type NativeLandmark } from './poseAdapter';
 
 function poseFrame(landmarks: PoseLandmark[]): PoseFrame {
   return {
@@ -42,4 +42,15 @@ test('visible-side selection chooses the usable side and rejects insufficient vi
   assert.equal(selectVisibleSide(poseFrame([...side(left, 0.92), ...side(right, 0.7)])), 'left');
   assert.equal(selectVisibleSide(poseFrame([...side(left, 0.5), ...side(right, 0.88)])), 'right');
   assert.equal(selectVisibleSide(poseFrame([...side(left, 0.5), ...side(right, 0.4)])), null);
+});
+
+test('sensor-landscape landmarks are rotated upright with shoulders above ankles', () => {
+  const landmarks: NativeLandmark[] = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 1 }));
+  landmarks[11] = { x: 0.2, y: 0.48, z: 0, visibility: 1 };
+  landmarks[12] = { x: 0.2, y: 0.52, z: 0, visibility: 1 };
+  landmarks[27] = { x: 0.9, y: 0.48, z: 0, visibility: 1 };
+  landmarks[28] = { x: 0.9, y: 0.52, z: 0, visibility: 1 };
+  const upright = orientLandmarksUpright(landmarks);
+  assert.ok(upright[11]!.y < upright[27]!.y);
+  assert.ok(Math.abs(upright[11]!.x - upright[27]!.x) < 0.1);
 });

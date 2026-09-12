@@ -35,6 +35,13 @@ upright image dimensions and does not force the sensor orientation to portrait.
 This keeps normalized landmarks and the pixel geometry used for thigh inclination
 in the same coordinate system.
 
+The installed live-stream bridge may still return landmark coordinates in the
+sensor's landscape orientation. Before emitting a `PoseFrame`, the adapter evaluates
+the four quarter-turns and selects the upright squat orientation in which the
+shoulder midpoint is above the ankle midpoint and the shoulder-to-ankle body axis is
+most vertical. This affects only orientation; it does not alter confidence or infer
+new landmarks.
+
 During setup, NextRep compares detector-supplied visibility for the left and right
 shoulder, hip, knee, and ankle. It selects the usable side with the higher total and
 holds that anatomical side for the analyzer session. Until one side is usable, the

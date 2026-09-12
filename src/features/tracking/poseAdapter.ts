@@ -16,6 +16,37 @@ export interface NativePoseResultBundle {
   inputImageHeight: number;
 }
 
+type QuarterTurn = 0 | 90 | -90 | 180;
+
+function rotateLandmark(landmark: NativeLandmark, turn: QuarterTurn): NativeLandmark {
+  if (turn === 90) return { ...landmark, x: landmark.y, y: 1 - landmark.x };
+  if (turn === -90) return { ...landmark, x: 1 - landmark.y, y: landmark.x };
+  if (turn === 180) return { ...landmark, x: 1 - landmark.x, y: 1 - landmark.y };
+  return landmark;
+}
+
+/**
+ * MediaPipe 0.6.0 can return live-stream landmarks in sensor orientation even
+ * when portrait output was requested. Choose the quarter-turn that makes the
+ * supported standing body axis run from shoulders above to ankles below.
+ */
+export function orientLandmarksUpright(landmarks: readonly NativeLandmark[]): NativeLandmark[] {
+  const turns: readonly QuarterTurn[] = [0, 90, -90, 180];
+  let bestTurn: QuarterTurn = 0;
+  let bestScore = -Infinity;
+  for (const turn of turns) {
+    const rotated = landmarks.map((landmark) => rotateLandmark(landmark, turn));
+    const shoulders = [rotated[11], rotated[12]].filter((point): point is NativeLandmark => point !== undefined);
+    const ankles = [rotated[27], rotated[28]].filter((point): point is NativeLandmark => point !== undefined);
+    if (shoulders.length !== 2 || ankles.length !== 2) continue;
+    const shoulder = { x: (shoulders[0]!.x + shoulders[1]!.x) / 2, y: (shoulders[0]!.y + shoulders[1]!.y) / 2 };
+    const ankle = { x: (ankles[0]!.x + ankles[1]!.x) / 2, y: (ankles[0]!.y + ankles[1]!.y) / 2 };
+    const score = (ankle.y - shoulder.y) - Math.abs(ankle.x - shoulder.x);
+    if (score > bestScore) { bestScore = score; bestTurn = turn; }
+  }
+  return landmarks.map((landmark) => rotateLandmark(landmark, bestTurn));
+}
+
 const SIDE_LANDMARKS = {
   left: [11, 23, 25, 27],
   right: [12, 24, 26, 28],
@@ -47,8 +78,9 @@ export function normalizePoseResult(
   timestamp: number,
   orientedImage = { width: bundle.inputImageWidth, height: bundle.inputImageHeight },
 ): PoseFrame | null {
-  const landmarks = bundle.results[0]?.landmarks[0];
-  if (!landmarks?.length || orientedImage.width <= 0 || orientedImage.height <= 0) return null;
+  const nativeLandmarks = bundle.results[0]?.landmarks[0];
+  if (!nativeLandmarks?.length || orientedImage.width <= 0 || orientedImage.height <= 0) return null;
+  const landmarks = orientLandmarksUpright(nativeLandmarks);
   return {
     timestamp,
     timestampUnit: 'milliseconds',
