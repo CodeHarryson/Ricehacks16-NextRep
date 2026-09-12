@@ -13,10 +13,10 @@ import { DEMO_WORKOUT_ZONES } from './zones';
 import { loadLocationTestRole, saveLocationTestRole, simulatedCoordinates, type LocationTestRole } from './simulation';
 
 type MapStatus = 'loading' | 'ready' | 'permission-denied' | 'location-disabled' | 'offline' | 'empty';
-interface MapScreenProps { onOpenChallenges: (opponent: NearbyUser | null) => void; }
+interface MapScreenProps { onOpenChallenges: (opponent: NearbyUser | null) => void; onNearbyChange?: (users: NearbyUser[]) => void; }
 function coordinatesOf(location: Location.LocationObject): Coordinates { return { latitude: location.coords.latitude, longitude: location.coords.longitude }; }
 
-export function MapScreen({ onOpenChallenges }: MapScreenProps) {
+export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) {
   const [status, setStatus] = useState<MapStatus>('loading');
   const [sharing, setSharing] = useState(true);
   const [user, setUser] = useState<DemoUser | null>(null);
@@ -95,6 +95,7 @@ export function MapScreen({ onOpenChallenges }: MapScreenProps) {
     if (role === 'real') { setLocationMode('real'); currentRef.current = null; setCurrent(null); setMapLoaded(false); lastSent.current = null; await startSharing(user); }
     else await startSimulation(user, role);
   }, [startSharing, startSimulation, user]);
+  useEffect(() => { onNearbyChange?.(nearby); }, [nearby, onNearbyChange]);
   const center: [number, number] | undefined = useMemo(() => current ? [current.longitude, current.latitude] : undefined, [current]);
   useEffect(() => {
     mounted.current = true; let cancelled = false; let demoUserForCleanup: DemoUser | null = null;

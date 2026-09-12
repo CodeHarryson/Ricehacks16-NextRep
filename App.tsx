@@ -12,6 +12,7 @@ import type { WorkoutSessionConfig } from './src/features/workout/session';
 export default function App() {
   const [screen, setScreen] = useState<'home' | 'workout' | 'progression' | 'map' | 'challenge'>('home');
   const [challengeOpponent, setChallengeOpponent] = useState<NearbyUser | null>(null);
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [workoutSession, setWorkoutSession] = useState<WorkoutSessionConfig | undefined>();
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -37,8 +38,8 @@ export default function App() {
         {screen === 'workout' ? <WorkoutScreen session={workoutSession} /> : screen === 'progression' ? <ProgressionScreen /> : <>
           {/* Keep the map mounted (hidden) on the challenge screen: unmounting it stops presence,
               and the server rejects challenges unless both players have active presence. */}
-          <View style={{ display: screen === 'map' ? 'flex' : 'none' }}><MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} /></View>
-          {screen === 'challenge' && <ChallengeScreen opponent={challengeOpponent} onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
+          <View style={{ display: screen === 'map' ? 'flex' : 'none' }}><MapScreen onOpenChallenges={(opponent) => { setChallengeOpponent(opponent); setScreen('challenge'); }} onNearbyChange={setNearbyUsers} /></View>
+          {screen === 'challenge' && <ChallengeScreen opponent={challengeOpponent} nearbyUsers={nearbyUsers}onBack={() => setScreen('map')} onStartWorkout={(session) => { setWorkoutSession(session); setScreen('workout'); }} />}
         </>}
       </>}
     </ScrollView>
