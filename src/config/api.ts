@@ -21,7 +21,8 @@ function normalize(value: string | undefined, fallback: string): string {
 function detectPhysicalDevice(): boolean {
   // Keep the pure resolver usable by Node's test runner; Expo Device is loaded
   // only in the native runtime where its supported `isDevice` flag is present.
-  if (process.argv.includes('--test')) return true;
+  // React Native's `process` shim has no `argv`, so guard before reading it.
+  if (process.argv?.includes('--test')) return true;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const device = require('expo-device') as { isDevice?: boolean };
