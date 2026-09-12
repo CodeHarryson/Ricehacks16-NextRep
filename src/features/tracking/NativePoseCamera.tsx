@@ -60,7 +60,7 @@ export function NativePoseCamera({ device, active, position, onFrame, onTracking
     onInitialized={onInitialized}
     onError={(error) => onError(`Camera unavailable: ${error.code}`)}
     />
-    <PoseOverlay frame={overlayFrame} width={layout.width} height={layout.height} mirrored={position === 'front'} />
+    <PoseOverlay frame={overlayFrame} width={layout.width} height={layout.height} mirrored={false} />
   </View>;
 }
 

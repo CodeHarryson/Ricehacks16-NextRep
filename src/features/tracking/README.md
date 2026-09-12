@@ -50,6 +50,9 @@ translated into neutral framing/reacquisition guidance; they never become red re
 The workout preview uses `contain` so the complete portrait analysis image remains
 visible. Its overlay maps the same upright coordinates onto shoulder, hip, knee, and
 ankle dots and connections; green dots identify the side selected for analysis.
+The installed bridge's front-camera landmark coordinates already align with the
+mirrored VisionCamera preview after upright normalization, so the overlay does not
+apply a second horizontal flip.
 
 ## Comparison reference
 
