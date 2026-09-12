@@ -2,6 +2,16 @@ import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 
 export const POSE_MODEL_ASSET = 'pose_landmarker_lite.task';
 
+/** The pose clock: monotonic milliseconds, used for PoseFrame and analyzer timestamps. */
+export function monotonicMilliseconds(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+/** Convert a pose-clock timestamp to Unix milliseconds, as AttemptResult requires. */
+export function monotonicToUnixMilliseconds(timestamp: number, nowUnix = Date.now(), nowMonotonic = monotonicMilliseconds()): number {
+  return timestamp + (nowUnix - nowMonotonic);
+}
+
 export interface NativeLandmark {
   x: number;
   y: number;

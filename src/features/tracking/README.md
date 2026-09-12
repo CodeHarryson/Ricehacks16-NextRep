@@ -11,22 +11,22 @@ means `x` increases rightward and `y` downward in an upright image, origin top-l
 The front-camera preview may be mirrored for the person while analysis coordinates
 remain unmirrored. Callback arrival uses monotonic `performance.now()` milliseconds;
 this is a session clock because the installed package does not expose a consistent
-cross-platform capture timestamp.
+capture timestamp. The workout screen converts analyzer attempt times to Unix
+milliseconds (`monotonicToUnixMilliseconds`) before checking them against the
+session deadline, as the `AttemptResult` contract requires.
 
 `onTracking` reports initializing, tracking, lost, and error separately from
 `onFrame`. Invalid or empty results never become squat attempts. The workout screen
 passes valid `PoseFrame`s to one `SquatAnalyzer`; its exact-once attempt events drive
 the live count. The adapter supplies no synthetic results.
 
-Required native permissions are camera only: iOS `NSCameraUsageDescription` and
-Android `android.permission.CAMERA`. Build with `npx expo prebuild --no-install`,
-then `npm run ios` or `npm run android` on a signed physical development client.
+The only required camera permission is iOS `NSCameraUsageDescription`. Build with
+`npx expo prebuild --no-install`, then `npm run ios` on a signed physical
+development client.
 
 The camera must report its device and `contain` resize mode to the MediaPipe hook and
 request VisionCamera's `rgb` pixel format, matching the installed package's camera
-wrapper. The Android 0.6.0 bridge omits MediaPipe visibility and presence values by
-default; `patches/react-native-mediapipe+0.6.0.patch` preserves those detector values
-without inventing replacements. `patch-package` reapplies this after installation.
+wrapper.
 
 Physical camera buffers commonly retain a landscape sensor size even while the
 detector outputs upright portrait landmarks. The adapter uses
@@ -93,7 +93,7 @@ health independently of completed `AttemptResult` events.
 
 ## Not yet validated
 
-Real iOS/Android devices, model inference quality, camera orientation/mirroring,
+Real iPhones, model inference quality, camera orientation/mirroring,
 inference rate, lighting/framing/body-proportion variation, and five-rep accuracy
 remain untested in this environment. Native compilation is currently blocked by
-the local Xcode 26.6 React Native fmt error and Android has no JDK installed.
+the local Xcode 26.6 React Native fmt error.

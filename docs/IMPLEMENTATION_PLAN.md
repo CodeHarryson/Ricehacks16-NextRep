@@ -135,7 +135,7 @@ flowchart LR
 | Owner | Primary responsibility | Boundary and risk |
 | --- | --- | --- |
 | CV | Landmark features, temporal rep state machine, rating rubric, replay tests | Pure TypeScript; must not invent confidence or attach rewards to frames. |
-| Native | Camera, MediaPipe adapter, model packaging, lifecycle, iOS/Android builds | Highest early integration risk; must establish landmarks on both phones. |
+| Native | Camera, MediaPipe adapter, model packaging, lifecycle, iOS build | Highest early integration risk; must establish landmarks on an iPhone. |
 | Workout UI | Setup, guidance, counter, color/text/audio feedback, weekly consistency UI | Depends on stable event contracts; do not present simulation as CV output. |
 | Game integration | Location/check-in, shared battle state, resolution, rewards, persistence | Largest feature surface after native integration; needs idempotent writes and conflict rules. |
 
@@ -215,7 +215,7 @@ gaps remain in [native-integration.md](native-integration.md).
    `AttemptResult`, workout config, workout completion, rewards, weekly result,
    and battle state. Establish IDs and deduplication rules before parallel work.
 2. **Prove camera → landmarks on real phones.** Build the development client and
-   wire one model through the native adapter on one named iPhone and Android phone.
+   wire one model through the native adapter on one named iPhone.
    Verify permissions, orientation, mirroring, timestamps, lifecycle and visible
    landmarks. Resolve the existing native build blockers first.
 3. **Build pure squat analysis.** Implement confidence/framing gate, calibration,
@@ -238,8 +238,7 @@ gaps remain in [native-integration.md](native-integration.md).
 ### Physical device and inference
 
 - Camera permission allow, deny, Settings recovery, front/back selection,
-  background/resume, navigation cleanup, and no microphone permission on one iPhone
-  and one Android device.
+  background/resume, navigation cleanup, and no microphone permission on an iPhone.
 - Each phone shows aligned landmarks for full-body, supported side-view squats.
   Record phone model, OS, app build, model asset/version/hash, environment,
   analyzed frame rate, latency, and failures.
@@ -296,8 +295,8 @@ gaps remain in [native-integration.md](native-integration.md).
 | Feedback | Planned: setup text exposes the green/yellow/red/neutral model only through documentation/contracts; no live result display or audio is implemented. |
 | Workout/game control | Solo and challenge camera sessions use validated configurations, synchronized challenge start times, a shared countdown/deadline clock, configured sets, rest periods, capped attempt processing, `score-v1` scoring, scoreable timeout finalization, local solo performance persistence, server challenge-result submission/resolution, and idempotent `battle-reward-v1` grants. Advanced leaderboards remain planned. |
 | Progression | Schema-v2 local player state persists XP, capped earned OVR, coins, processed attempt/reward IDs and completed workout IDs. One solo completion reward is serialized and idempotent across repeated delivery/reload. Upgrades, weekly target/streak and last-workout data are not implemented. |
-| Location/battle | Stage 3 location publishing, nearby map, proximity challenge handshake, shared squat configuration, challenge-aware camera navigation, timed session control, server-validated result submission, result polling/resolution, and idempotent `battle-reward-v1` grants are implemented. If only one result arrives by the deadline, the server cancels for opponent no-show with no winner or reward. Battle rewards never change permanent OVR; advanced leaderboards, shops, and production authentication remain planned. |
-| Validation | Typecheck, lint, JS bundle and pod install previously passed. Native iOS compile is blocked by the documented Xcode 26.6/RN `fmt` issue; Android native compile is blocked because this host lacks a Java runtime. No phone or inference test has been performed. |
+| Location/battle | Stage 3 location publishing, nearby map, proximity challenge handshake, shared squat configuration, challenge-aware camera navigation, timed session control, server-validated result submission, result polling/resolution, and idempotent `battle-reward-v1` grants are implemented. If only one result arrives within 60 seconds after the deadline, the server cancels for opponent no-show with no winner or reward. Battle rewards never change permanent OVR; advanced leaderboards, shops, and production authentication remain planned. |
+| Validation | Typecheck, lint, JS bundle and pod install previously passed. Native iOS compile is blocked by the documented Xcode 26.6/RN `fmt` issue. The app is iOS-only. No phone or inference test has been performed. |
 
 See [validation.md](validation.md) for exact prior commands and blockers. Do not
 represent anything in the planned rows as a demonstrated demo capability.

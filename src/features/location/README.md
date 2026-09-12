@@ -1,7 +1,7 @@
 # Location presence
 
 The map is a demo-only nearby-presence surface rendered by one MapLibre native
-map on iOS and Android with a hosted MapTiler style. A generated `demo-*` user ID
+map on iOS with a hosted MapTiler style. A generated `demo-*` user ID
 is stored locally until authentication exists; it is not an identity system.
 
 When `__DEV__` is enabled, choose Test Player A on one device and Test Player B

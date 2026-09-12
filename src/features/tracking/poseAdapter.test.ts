@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PoseFrame, PoseLandmark } from '../../contracts/pose';
-import { normalizePoseResult, orientLandmarksUpright, selectVisibleSide, type NativeLandmark } from './poseAdapter';
+import { monotonicToUnixMilliseconds, normalizePoseResult, orientLandmarksUpright, selectVisibleSide, type NativeLandmark } from './poseAdapter';
 
 function poseFrame(landmarks: PoseLandmark[]): PoseFrame {
   return {
@@ -65,4 +65,10 @@ test('close-face orientation does not depend on off-screen ankles', () => {
   const upright = orientLandmarksUpright(landmarks);
   assert.ok(Math.abs(upright[7]!.y - upright[8]!.y) < 0.05);
   assert.ok(upright[0]!.y > (upright[2]!.y + upright[5]!.y) / 2);
+});
+
+test('pose-clock timestamps convert to Unix milliseconds', () => {
+  assert.equal(monotonicToUnixMilliseconds(4_000, 1_700_000_010_000, 5_000), 1_700_000_009_000);
+  const now = Date.now();
+  assert.ok(Math.abs(monotonicToUnixMilliseconds(performance.now()) - now) < 1_000);
 });

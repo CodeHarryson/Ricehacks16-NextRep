@@ -8,17 +8,13 @@ import {
   type ViewCoordinator,
 } from 'react-native-mediapipe';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
-import { normalizePoseResult, POSE_MODEL_ASSET } from './poseAdapter';
+import { monotonicMilliseconds, normalizePoseResult, POSE_MODEL_ASSET } from './poseAdapter';
 
 export interface NativePoseAdapterProps {
   active: boolean;
   selectedSide: 'left' | 'right' | 'unknown';
   onFrame: (frame: PoseFrame) => void;
   onTracking: (update: TrackingUpdate) => void;
-}
-
-function monotonicMilliseconds(): number {
-  return globalThis.performance?.now?.() ?? Date.now();
 }
 
 const healthUpdate = (status: TrackingUpdate['status'], guidance: string, timestamp = monotonicMilliseconds()): TrackingUpdate => ({

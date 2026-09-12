@@ -2,7 +2,7 @@
 RiceHacks competition project 
 
 NextRep is a React Native fitness-game scaffold for HackRice 16. Target: physical
-iOS and Android phones; team deadline Sunday, September 13, 2026, 8 a.m. Central.
+iPhones (iOS only); team deadline Sunday, September 13, 2026, 8 a.m. Central.
 Scope: camera setup → native pose boundary → future five-squat set → saved upgrade.
 
 The current product scope, battle/consistency decisions, ownership, milestones, and
@@ -59,29 +59,6 @@ xcodebuild -workspace ios/NextRep.xcworkspace -scheme NextRep \
   -derivedDataPath /tmp/nextrep-derived CODE_SIGNING_ALLOWED=NO
 ```
 
-### Android
-
-Install JDK 17 and Android Studio with Android SDK Platform 36, Build Tools 36.0.0,
-platform-tools, NDK 27.1.12297006 and CMake. Set JAVA_HOME to your JDK and
-ANDROID_HOME to your SDK (macOS default below). Minimum phone OS is API 24.
-
-```sh
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
-java -version
-adb devices
-npm run prebuild
-npm run android
-# Optional USB Metro connection:
-adb reverse tcp:8081 tcp:8081
-npm start
-```
-
-Enable USB debugging and accept the computer authorization on the phone. Linux
-and Windows developers should use their local JDK/SDK paths. Standalone native
-check: `cd android && ./gradlew :app:assembleDebug`.
-
 ## Selected versions
 
 All direct versions are exact; package-lock.json locks the transitive npm graph.
@@ -100,7 +77,7 @@ React/React Native selection.
 
 Legacy architecture is explicitly enabled via `newArchEnabled: false`. This keeps
 the candidate's legacy bridge path available. Native compatibility is provisional
-until both platforms compile and run on phones. See the inspected upstream source,
+until the iOS app compiles and runs on a phone. See the inspected upstream source,
 licenses, SDK rationale, native dependency pins and known gaps in
 [native-integration.md](docs/native-integration.md). Expo development builds can
 host the native integration; there is no demonstrated need for bare RN.
@@ -116,7 +93,7 @@ host the native integration; there is no demonstrated need for bare RN.
 
 Shared contracts live in `src/contracts`; five-rep and location thresholds live in
 `src/config`. The demo nearby map is available from the home screen.
-Screens are intentionally simple local navigation with Android back handling.
+Screens are intentionally simple local navigation with on-screen back actions.
 Tracking now reports native initialization, tracking, lost and error states and
 feeds valid landmarks into the pure analyzer. No simulated counts, ratings, or
 rewards are shown in the real workout. Camera and storage behavior remain untested
@@ -171,7 +148,7 @@ isolated test worker behavior. Run the usual `npm test` command.
 
 ### MapLibre / MapTiler setup
 
-The nearby map uses one MapLibre native map on iOS and Android with a hosted
+The nearby map uses one MapLibre native map on iOS with a hosted
 MapTiler style. Create a MapTiler key and supply both values locally (never
 commit them):
 
@@ -183,20 +160,20 @@ npx expo prebuild --no-install
 
 The style URL receives the key safely at runtime when it does not already have
 one. Rebuild the development app after changing map configuration; Expo Go is
-not supported for this native module. The Android package is `com.nextrep.hackrice`.
+not supported for this native module.
 
 ## First real-phone test: camera → landmarks
 
-- [ ] Install the development build on one iPhone and one Android. Record OS,
-  model, build version and any native compile errors.
+- [ ] Install the development build on an iPhone. Record iOS version, model,
+  build version and any native compile errors.
 - [ ] Verify allow/deny/Settings/re-entry, front/back preview, background/resume,
   and navigation cleanup. Confirm the full body fits and no audio permission occurs.
-- [ ] Verify the bundled licensed `.task` model is present in both native targets,
+- [ ] Verify the bundled licensed `.task` model is present in the iOS app bundle,
   record its hash, and confirm the live frame processor emits landmarks on device.
-- [ ] Fix Android timestamp forwarding, verify clock units/order, and map image
-  dimensions, orientation, mirroring and 33 landmarks into PoseFrame.
+- [ ] Verify clock units/order, and map image dimensions, orientation, mirroring
+  and 33 landmarks into PoseFrame.
 - [ ] Add a labeled development landmark overlay; inspect shoulders, hips, knees
-  and ankles on both phones. Preserve provided visibility/presence; invent no scores.
+  and ankles on the phone. Preserve provided visibility/presence; invent no scores.
 - [ ] Verify empty/occluded/multiple-person cases and detector failures produce
   neutral guidance. Measure callback cadence and check stale results after resume.
 - [ ] Only then implement the TypeScript squat engine and connect attempt events

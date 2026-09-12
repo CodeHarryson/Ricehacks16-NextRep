@@ -135,7 +135,7 @@ replayed without retaining video; add model/version/device metadata beside frame
 ## Not yet validated
 
 - Real MediaPipe landmark quality or model asset behavior.
-- Actual iOS behavior and actual Android behavior.
+- Actual iOS behavior on an iPhone.
 - Real-device inference rate and capture-to-analysis latency.
 - Camera mirroring and orientation mapping.
 - Different body proportions, lighting, framing, clothing, and occlusion.

@@ -6,7 +6,7 @@ import type { AttemptResult } from '../../contracts/attempt';
 import type { PoseFrame, TrackingUpdate } from '../../contracts/pose';
 import { CameraPreview } from '../tracking/CameraPreview';
 import { assessFaceStart, FACE_START_HOLD_FRAMES } from '../tracking/faceStartGate';
-import { selectVisibleSide } from '../tracking/poseAdapter';
+import { monotonicToUnixMilliseconds, selectVisibleSide } from '../tracking/poseAdapter';
 import { DEFAULT_RUBRIC, SquatAnalyzer, type AnalyzerOutput, type SquatPhase } from '../squat/engine';
 import { grantBattleReward, grantCompletedWorkout, saveWorkoutPerformance } from '../progression/storage';
 import { loadDemoUser } from '../location/identity';
@@ -146,7 +146,9 @@ export function WorkoutScreen({ session }: { session?: WorkoutSessionConfig }) {
   }, [persistCompletion, resultStatus, sessionConfig.challengeId, sessionConfig.configVersion, sessionConfig.exercise, sessionConfig.matchTimeLimitSeconds, sessionConfig.mode, sessionConfig.setCount, sessionConfig.targetReps]);
   useEffect(() => { if (timeExpired && resultStatus === 'not_started') void finalizeSessionResult(false, null); }, [finalizeSessionResult, resultStatus, timeExpired]);
   const consumeAttempts = useCallback((attempts: readonly AttemptResult[]) => {
-    for (const attempt of attempts) {
+    for (const analyzerAttempt of attempts) {
+      // The analyzer stamps attempts on the monotonic pose clock; the session clock and AttemptResult use Unix ms.
+      const attempt: AttemptResult = { ...analyzerAttempt, startedAt: monotonicToUnixMilliseconds(analyzerAttempt.startedAt), endedAt: monotonicToUnixMilliseconds(analyzerAttempt.endedAt) };
       if (resting || !canAcceptSessionAttempt(clock.current, attempt.endedAt)) continue;
       const accepted = acceptAttempt(workout.current, attempt);
       if (accepted.state === workout.current) continue;

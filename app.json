@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
+    "platforms": ["ios"],
     "ios": {
       "bundleIdentifier": "com.nextrep.hackrice",
       "supportsTablet": false,
@@ -13,15 +14,6 @@
         "NSCameraUsageDescription": "NextRep uses your camera for on-device workout tracking.",
         "ITSAppUsesNonExemptEncryption": false
       }
-    },
-    "android": {
-      "package": "com.nextrep.hackrice",
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
-      "permissions": [
-        "android.permission.CAMERA"
-      ]
     },
     "plugins": [
       "expo-dev-client",

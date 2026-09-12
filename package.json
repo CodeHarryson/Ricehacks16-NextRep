@@ -6,14 +6,12 @@
   "scripts": {
     "start": "expo start --dev-client",
     "ios": "expo run:ios --device",
-    "android": "expo run:android --device",
     "prebuild": "expo prebuild --no-install",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --import tsx --test src/features/squat/*.test.ts src/features/tracking/*.test.ts src/features/workout/*.test.ts src/features/progression/*.test.ts src/features/location/*.test.ts src/features/challenge/*.test.ts",
     "replay": "tsx src/features/squat/replay.ts",
-    "check:bundle": "expo export --platform ios --platform android",
-    "postinstall": "patch-package"
+    "check:bundle": "expo export --platform ios"
   },
   "engines": {
     "node": ">=20.19.4"
@@ -23,7 +21,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "54.0.37",
     "expo-dev-client": "6.0.21",
-    "expo-device": "~7.0.3",
+    "expo-device": "8.0.10",
     "expo-location": "~19.0.8",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -40,7 +38,6 @@
     "babel-preset-expo": "54.0.10",
     "eslint": "9.39.1",
     "eslint-config-expo": "10.0.0",
-    "patch-package": "^8.0.0",
     "tsx": "4.20.6",
     "typescript": "5.9.2"
   }

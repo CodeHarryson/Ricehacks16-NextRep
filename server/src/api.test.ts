@@ -240,8 +240,21 @@ test('equal scores resolve as a draw and only participants can submit or read', 
   assert.equal((await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'intruder' } })).status, 404);
 });
 
+test('a result submitted at the deadline waits for the opponent during the grace period', async () => {
+  const startedAt = new Date(Date.now() - 45_000);
+  const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: startedAt });
+  const { db, resolution } = resolutionDb(challenge); const app = createApp(db);
+  const sessionStart = new Date(startedAt.getTime() + 10_000); const deadline = new Date(sessionStart.getTime() + 30_000);
+  const post = (userId: string, green: number) => app.request('http://local/challenges/c1/result', { method: 'POST', headers: { 'x-user-id': userId, 'x-idempotency-key': `${userId}-key` }, body: JSON.stringify(resultRequest(sessionStart, deadline, green, `${userId}-key`)) });
+  assert.equal((await post('sender', 1)).status, 201);
+  assert.equal(resolution.resolution_status, 'pending');
+  assert.equal((await (await app.request('http://local/challenges/c1/results', { headers: { 'x-user-id': 'sender' } })).json()).resolution.status, 'pending');
+  assert.equal((await post('receiver', 3)).status, 201);
+  assert.equal(resolution.resolution_status, 'resolved'); assert.equal(resolution.winner_id, 'receiver'); assert.equal(resolution.winning_score, 330);
+});
+
 test('one result is cancelled after the deadline using the opponent no-show rule', async () => {
-  const startedAt = new Date(Date.now() - 50_000);
+  const startedAt = new Date(Date.now() - 120_000);
   const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: startedAt });
   const { db, resolution } = resolutionDb(challenge); const app = createApp(db);
   const sessionStart = new Date(startedAt.getTime() + 10_000); const deadline = new Date(sessionStart.getTime() + 30_000);
@@ -252,7 +265,7 @@ test('one result is cancelled after the deadline using the opponent no-show rule
 });
 
 test('GET results cancels a pending one-sided challenge after its deadline', async () => {
-  const startedAt = new Date(Date.now() - 50_000);
+  const startedAt = new Date(Date.now() - 120_000);
   const challenge = challengeRow({ status: 'active', exercise: 'bodyweight_squat', config_version: 1, set_count: 1, target_reps: 5, match_time_limit_seconds: 30, started_at: startedAt });
   const { db, results, resolution, queries } = resolutionDb(challenge);
   results.push({ result_id: 'existing', challenge_id: 'c1', participant_id: 'sender', config_version: 1, exercise: 'bodyweight_squat', counted_reps: 1, green_reps: 1, yellow_reps: 0, red_attempts: 0, neutral_attempts: 0, total_score: 110, score_policy_version: 'score-v1', started_at: new Date(startedAt.getTime() + 10_000), ended_at: new Date(startedAt.getTime() + 40_000), submitted_at: new Date(), idempotency_key: 'existing-key' });

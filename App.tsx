@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BackHandler, ScrollView, StatusBar, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Action, Card, styles } from './src/components/ui';
 import { ProgressionScreen } from './src/features/progression/ProgressionScreen';
@@ -14,13 +14,6 @@ export default function App() {
   const [challengeOpponent, setChallengeOpponent] = useState<NearbyUser | null>(null);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [workoutSession, setWorkoutSession] = useState<WorkoutSessionConfig | undefined>();
-  useEffect(() => {
-    const listener = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (screen === 'home') return false;
-      setScreen(screen === 'challenge' ? 'map' : 'home'); return true;
-    });
-    return () => listener.remove();
-  }, [screen]);
   return <SafeAreaProvider><SafeAreaView style={styles.screen}>
     <StatusBar barStyle="light-content" />
     <ScrollView contentContainerStyle={styles.content}>

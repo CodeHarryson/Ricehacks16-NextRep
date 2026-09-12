@@ -29,27 +29,18 @@ cross into JavaScript as raw images.
   Worklets plugin are configured. Two older proposal Babel plugins are explicitly
   pinned because Worklets Core 1.6.2 requests them by name during bundling.
 - Inspect the **installed npm artifact**, not only main: its podspec pins
-  MediaPipeTasksVision **0.10.12** and depends on VisionCamera. Its published
-  Android Gradle file pins tasks-vision **0.10.2** and camera-core **1.3.3**.
-  NextRep patches Android to **0.10.14**, the nearest inspected release whose
-  `NormalizedLandmark` API exposes MediaPipe's optional visibility and presence
-  values. The original 0.10.2 API exposes only x/y/z; adding calls to those absent
-  methods caused `:react-native-mediapipe:compileDebugKotlin` to fail in EAS build
-  `5f04878c-c5b0-48e2-9e7b-02ffe5f5dc9b`. GitHub main instead uses tasks-vision
-  0.10.26. The 0.10.14 override and bridge conversion live in
-  `patches/react-native-mediapipe+0.6.0.patch` and are reapplied after installs.
-  Gradle resolves CameraX transitives; inspect dependency resolution and test on a
-  phone before asserting binary compatibility or Android 16 KB page support.
-- Upstream's README lists iOS 12 / Android minimum 24, but this app's framework
-  minimum is **iOS 15.1 / Android API 24**. Use the higher framework requirement.
+  MediaPipeTasksVision **0.10.12** and depends on VisionCamera. NextRep is iOS-only,
+  so the package's Android sources and Gradle pins are unused.
+- Upstream's README lists iOS 12, but this app's framework minimum is **iOS 15.1**.
+  Use the higher framework requirement.
 
 ## Current adapter and model
 
 1. `assets/pose_landmarker_lite.task` is the official Lite float16 model, version 1,
    SHA-256 `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`,
    downloaded from [Google's model URL](https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task).
-   `plugins/withPoseLandmarkerModel.js` copies it into Android `assets` and iOS
-   Copy Bundle Resources. Confirm the model's current redistribution terms before
+   `plugins/withPoseLandmarkerModel.js` copies it into the iOS project and adds
+   it to Copy Bundle Resources. Confirm the model's current redistribution terms before
    shipping; the npm adapter is MIT and MediaPipe source is Apache-2.0.
 2. `usePoseDetection(callbacks, RunningMode.LIVE_STREAM, 'pose_landmarker_lite.task', options)`
    is the exact installed 0.6.0 API. Options are one pose, CPU delegate, 0.5
@@ -57,11 +48,11 @@ cross into JavaScript as raw images.
    and forced portrait output/camera orientation. The package hook releases the
    detector handle on unmount. Camera lifecycle, front/back selection, permission,
    and app-active state remain in `CameraPreview`.
-3. The package callback does not expose one consistent capture timestamp in its TS
-   contract (iOS and Android native implementations differ), so the adapter uses
-   monotonic `performance.now()` at result arrival and rejects non-increasing
-   callbacks. This is an explicit session clock, not capture time; a future native
-   patch should forward monotonic capture timestamps on both platforms.
+3. The package callback does not expose a capture timestamp in its TS contract, so
+   the adapter uses monotonic `performance.now()` at result arrival and rejects
+   non-increasing callbacks. This is an explicit session clock, not capture time;
+   attempt times are converted to Unix milliseconds before they reach the workout
+   controller. A future native patch could forward monotonic capture timestamps.
 4. Normalize upright, unmirrored image coordinates and corresponding dimensions
    into PoseFrame. Account for front camera mirroring and preview crop separately.
    Preserve optional visibility/presence only when supplied. Do not fabricate a
@@ -70,12 +61,9 @@ cross into JavaScript as raw images.
 5. Release the detector and invalidate any active attempt on navigation,
    backgrounding, tracking loss and camera switches. Then connect the pure engine.
 
-The workout camera is inside a rounded container that clips its contents. Vision
-Camera defaults to Android `SurfaceView`, which does not support clipping, masks,
-transparency, or rotation. NextRep selects
-`androidPreviewViewType="texture-view"` for this composed preview and marks the
-camera ready only after `onPreviewStarted`. Pose inference still consumes native
-RGB frames and is unaffected by the preview rendering mode.
+The workout camera is inside a rounded container that clips its contents. NextRep
+marks the camera ready only after `onPreviewStarted`. Pose inference consumes
+native RGB frames and is unaffected by the preview rendering.
 
 ## Algorithm reference and licensing
 

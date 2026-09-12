@@ -4,21 +4,16 @@ const { withDangerousMod, withXcodeProject, withPodfile, IOSConfig } = require('
 
 const MODEL = 'pose_landmarker_lite.task';
 
-function copyModel(config, platform) {
-  return withDangerousMod(config, [platform, async (modConfig) => {
+function copyModel(config) {
+  return withDangerousMod(config, ['ios', async (modConfig) => {
     const source = path.join(modConfig.modRequest.projectRoot, 'assets', MODEL);
-    const destination = platform === 'android'
-      ? path.join(modConfig.modRequest.platformProjectRoot, 'app', 'src', 'main', 'assets', MODEL)
-      : path.join(modConfig.modRequest.platformProjectRoot, MODEL);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.copyFileSync(source, destination);
+    fs.copyFileSync(source, path.join(modConfig.modRequest.platformProjectRoot, MODEL));
     return modConfig;
   }]);
 }
 
 module.exports = function withPoseLandmarkerModel(config) {
-  config = copyModel(config, 'android');
-  config = copyModel(config, 'ios');
+  config = copyModel(config);
   config = withPodfile(config, (modConfig) => {
     const marker = '# NextRep deployment target normalization';
     if (!modConfig.modResults.contents.includes(marker)) {

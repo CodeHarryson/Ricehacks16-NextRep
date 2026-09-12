@@ -49,7 +49,6 @@ export function NativePoseCamera({ device, active, position, faceStartActive, on
     style={StyleSheet.absoluteFill}
     device={device}
     resizeMode="contain"
-    androidPreviewViewType="texture-view"
     pixelFormat="rgb"
     isActive={active}
     photo={false}

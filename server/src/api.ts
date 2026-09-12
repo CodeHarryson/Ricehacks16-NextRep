@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN, RESULT_MAX_FUTURE_SKEW_SECONDS, SESSION_COUNTDOWN_SECONDS } from './config.js';
+import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN, RESULT_MAX_FUTURE_SKEW_SECONDS, RESULT_SUBMISSION_GRACE_SECONDS, SESSION_COUNTDOWN_SECONDS } from './config.js';
 import { pool, type DbClient } from './db.js';
 import { quantizeCoordinate, validatePresence, type PresenceInput } from './validation.js';
 
@@ -251,7 +251,7 @@ export function createApp(db: DbClient = pool): Hono {
     const inserted = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1 AND participant_id = $2', [challenge.challenge_id, participantId]);
     const result = inserted.rows[0]; if (!result) return context.json({ error: 'result submission failed' }, 500);
     const allResults = await db.query<ResultRow>('SELECT * FROM challenge_participant_results WHERE challenge_id = $1', [challenge.challenge_id]);
-    if (allResults.rows.length >= 2 || deadline.getTime() <= Date.now()) {
+    if (allResults.rows.length >= 2 || deadline.getTime() + RESULT_SUBMISSION_GRACE_SECONDS * 1000 <= Date.now()) {
       if (allResults.rows.length < 2) {
         await db.query(`UPDATE challenges SET resolution_status = 'cancelled', resolved_at = COALESCE(resolved_at, NOW()), winner_id = NULL, winning_score = NULL WHERE challenge_id = $1 AND resolution_status = 'pending'`, [challenge.challenge_id]);
       } else {
@@ -270,7 +270,7 @@ export function createApp(db: DbClient = pool): Hono {
     let state = resolution.rows[0];
     const serverStart = challenge.started_at ? new Date(challenge.started_at) : new Date(Number.NaN);
     const deadline = new Date(serverStart.getTime() + (SESSION_COUNTDOWN_SECONDS + challenge.match_time_limit_seconds) * 1000);
-    if (state?.resolution_status === 'pending' && results.rows.length === 1 && Number.isFinite(deadline.getTime()) && deadline.getTime() <= Date.now()) {
+    if (state?.resolution_status === 'pending' && results.rows.length === 1 && Number.isFinite(deadline.getTime()) && deadline.getTime() + RESULT_SUBMISSION_GRACE_SECONDS * 1000 <= Date.now()) {
       await db.query(`UPDATE challenges SET resolution_status = 'cancelled', resolved_at = COALESCE(resolved_at, NOW()), winner_id = NULL, winning_score = NULL WHERE challenge_id = $1 AND resolution_status = 'pending'`, [challenge.challenge_id]);
       state = { resolution_status: 'cancelled', winner_id: null, winning_score: null, resolved_at: new Date() };
     }
