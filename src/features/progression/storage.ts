@@ -52,6 +52,14 @@ function isPlayerV1(value: unknown): value is { schemaVersion: 1; xp: number; ch
     typeof characterLevel === 'number' && Number.isSafeInteger(characterLevel) && characterLevel >= 1 && isStringList(player.processedAttemptKeys);
 }
 
+/**
+ * Schema v1's level 1 was the baseline player. Preserve each earned legacy
+ * level as one OVR above the schema-v2 baseline, capped at the v2 maximum.
+ */
+function migrateCharacterLevelToOverallRating(characterLevel: number): number {
+  return characterLevel >= 40 ? 99 : 59 + characterLevel;
+}
+
 async function loadPlayerUnsafe(): Promise<PlayerState> {
   const raw = await storage.getItem(KEY);
   if (raw === null) {
@@ -70,7 +78,7 @@ async function loadPlayerUnsafe(): Promise<PlayerState> {
     const migrated: PlayerState = {
       schemaVersion: 2,
       xp: parsed.xp,
-      overallRating: 60,
+      overallRating: migrateCharacterLevelToOverallRating(parsed.characterLevel),
       coins: 0,
       processedAttemptKeys: [...parsed.processedAttemptKeys],
       processedRewardIds: [],

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { WORKOUT_COMPLETION_REWARD } from '../../config/workout';
 import { grantCompletedWorkout, loadPlayer, setPlayerStorageForTesting } from './storage';
 
 class MemoryStorage {
@@ -30,20 +31,25 @@ test('creates schema v2 player and migrates valid v1 data', async () => {
   assert.equal(migrated.schemaVersion, 2);
   assert.equal(migrated.xp, 40);
   assert.deepEqual(migrated.processedAttemptKeys, ['attempt']);
-  assert.equal(migrated.overallRating, 60);
+  assert.equal(migrated.overallRating, 61);
+
+  const highLevel = new MemoryStorage();
+  highLevel.values.set(key, JSON.stringify({ schemaVersion: 1, xp: 1000, characterLevel: 99, processedAttemptKeys: [] }));
+  setPlayerStorageForTesting(highLevel);
+  assert.equal((await loadPlayer()).overallRating, 99);
 });
 
 test('grants a completed workout exactly once, persists IDs, and caps OVR', async () => {
   const memory = new MemoryStorage();
   setPlayerStorageForTesting(memory);
-  const reward = { workoutId: 'completion:s', rewardId: 'reward:completion:s', attemptKeys: ['a', 'b'], xp: 25, coins: 0, overallRatingDelta: 50 };
+  const reward = { workoutId: 'completion:s', rewardId: 'reward:completion:s', attemptKeys: ['a', 'b'], ...WORKOUT_COMPLETION_REWARD, overallRatingDelta: 50 };
   const first = await grantCompletedWorkout(reward);
   const repeated = await grantCompletedWorkout(reward);
   assert.equal(first.granted, true);
-  assert.equal(first.player.xp, 25);
+  assert.equal(first.player.xp, WORKOUT_COMPLETION_REWARD.xp);
   assert.equal(first.player.overallRating, 99);
   assert.equal(repeated.granted, false);
-  assert.equal(repeated.player.xp, 25);
+  assert.equal(repeated.player.xp, WORKOUT_COMPLETION_REWARD.xp);
   assert.deepEqual(repeated.player.processedRewardIds, [reward.rewardId]);
 });
 
@@ -52,21 +58,21 @@ test('failed persistence does not commit a reward and the same ID retries safely
   setPlayerStorageForTesting(memory);
   await loadPlayer();
   memory.failWrites = true;
-  const reward = { workoutId: 'completion:retry', rewardId: 'reward:completion:retry', attemptKeys: [], xp: 25, coins: 0, overallRatingDelta: 1 };
+  const reward = { workoutId: 'completion:retry', rewardId: 'reward:completion:retry', attemptKeys: [], ...WORKOUT_COMPLETION_REWARD };
   await assert.rejects(grantCompletedWorkout(reward), /disk full/);
   memory.failWrites = false;
   const retried = await grantCompletedWorkout(reward);
   assert.equal(retried.granted, true);
-  assert.equal(retried.player.xp, 25);
+  assert.equal(retried.player.xp, WORKOUT_COMPLETION_REWARD.xp);
 });
 
 test('concurrent reward requests serialize and keep each reward idempotent', async () => {
   const memory = new MemoryStorage();
   setPlayerStorageForTesting(memory);
-  const reward = { workoutId: 'completion:concurrent', rewardId: 'reward:completion:concurrent', attemptKeys: ['a'], xp: 25, coins: 0, overallRatingDelta: 1 };
+  const reward = { workoutId: 'completion:concurrent', rewardId: 'reward:completion:concurrent', attemptKeys: ['a'], ...WORKOUT_COMPLETION_REWARD };
   const results = await Promise.all([grantCompletedWorkout(reward), grantCompletedWorkout(reward)]);
   assert.deepEqual(results.map((result) => result.granted).sort(), [false, true]);
-  assert.equal((await loadPlayer()).xp, 25);
+  assert.equal((await loadPlayer()).xp, WORKOUT_COMPLETION_REWARD.xp);
 });
 
 test('invalid saved data is not overwritten', async () => {

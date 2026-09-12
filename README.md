@@ -92,7 +92,7 @@ React/React Native selection.
 | Expo / development client | 54.0.37 / 6.0.21 |
 | React Native / React | 0.81.5 / 19.1.0 |
 | VisionCamera / Worklets Core | 4.7.3 / 1.6.2 |
-| react-native-mediapipe (candidate, not wired) | 0.6.0 |
+| react-native-mediapipe (live-stream integration; phone validation pending) | 0.6.0 |
 | AsyncStorage / safe-area-context | 2.2.0 / 5.6.0 |
 | TypeScript | 5.9.2 |
 | ESLint / Expo lint config | 9.39.1 / 10.0.0 |
@@ -116,13 +116,13 @@ host the native integration; there is no demonstrated need for bare RN.
 Shared contracts live in `src/contracts`; five-rep goal in `src/config`.
 Screens are intentionally simple local navigation with Android back handling.
 Tracking now reports native initialization, tracking, lost and error states and
-feeds valid landmarks into the pure analyzer. No fake counts, ratings, rewards or
-development fixtures are shown in the real workout. Camera and storage behavior
-remain untested on physical devices; a bundle passing does not validate native code.
+feeds valid landmarks into the pure analyzer. No simulated counts, ratings, or
+rewards are shown in the real workout. Camera and storage behavior remain untested
+on physical devices; a bundle passing does not validate native code.
 
 See [workout ownership notes](src/features/workout/README.md) for end-of-attempt
-rating semantics, neutral tracking loss, controller-owned totals and persistent
-dedup requirements before enabling XP. Do not connect rewards directly to frames.
+rating semantics, neutral tracking loss, controller-owned totals, and the
+idempotent local XP/OVR grant. Do not connect rewards directly to frames.
 
 ## First real-phone test: camera → landmarks
 
@@ -130,8 +130,8 @@ dedup requirements before enabling XP. Do not connect rewards directly to frames
   model, build version and any native compile errors.
 - [ ] Verify allow/deny/Settings/re-entry, front/back preview, background/resume,
   and navigation cleanup. Confirm the full body fits and no audio permission occurs.
-- [ ] Bundle a licensed official `.task` model in both native targets using a
-  repeatable config plugin; record its hash. Connect the candidate frame processor.
+- [ ] Verify the bundled licensed `.task` model is present in both native targets,
+  record its hash, and confirm the live frame processor emits landmarks on device.
 - [ ] Fix Android timestamp forwarding, verify clock units/order, and map image
   dimensions, orientation, mirroring and 33 landmarks into PoseFrame.
 - [ ] Add a labeled development landmark overlay; inspect shoulders, hips, knees

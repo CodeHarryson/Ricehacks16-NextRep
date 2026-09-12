@@ -295,7 +295,7 @@ gaps remain in [native-integration.md](native-integration.md).
 | --- | --- |
 | App shell | Implemented: Expo/TypeScript app with local home, workout setup, and progression screens. |
 | Camera | Implemented but untested on phones: permission flow, VisionCamera preview, front/back switch, app lifecycle handling. |
-| Native pose | Planned: a `react-native-mediapipe` candidate is installed/autolinked, but the exported adapter explicitly reports “Pose tracking not connected”; no model or landmark output is wired. |
+| Native pose | Integrated but untested on phones: `react-native-mediapipe` live-stream callbacks normalize landmarks into `PoseFrame` and report tracking health. Real device inference quality, model behavior, orientation, and lifecycle validation remain required. |
 | Squat logic | Partial implementation: `src/features/squat` now has pure pixel-space thigh-inclination features, standing calibration, time smoothing, visibility/framing/view/jump/gap gates, temporal state machine, attempt ratings, exactly-once timestamps, replay fixtures, and deterministic logic tests. Real MediaPipe landmark quality, threshold calibration, and device validation remain planned. |
 | Feedback | Planned: setup text exposes the green/yellow/red/neutral model only through documentation/contracts; no live result display or audio is implemented. |
 | Workout/game control | Solo five-rep integration implemented: live completed attempts flow through a capped, session/set-validating controller with attempt-key/ID deduplication, one completion event, visible set/reward status, and retryable local persistence. Rest, match limits and battle scoring are not implemented. |
@@ -305,3 +305,7 @@ gaps remain in [native-integration.md](native-integration.md).
 
 See [validation.md](validation.md) for exact prior commands and blockers. Do not
 represent anything in the planned rows as a demonstrated demo capability.
+
+Schema-v1 migration maps `characterLevel` 1–40 to overall rating 60–99 using
+`overallRating = min(99, 59 + characterLevel)`. This preserves the baseline at
+level 1 and every earned legacy level within the schema-v2 rating bounds.
