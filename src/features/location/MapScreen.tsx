@@ -96,6 +96,7 @@ export function MapScreen({ onOpenChallenges, onNearbyChange }: MapScreenProps) 
   const startSimulation = useCallback(async (demoUser: DemoUser, role: Exclude<LocationTestRole, 'real'>) => {
     const coordinates = simulatedCoordinates(role); if (!coordinates) return;
     watcher.current?.remove(); watcher.current = null; setLocationMode('simulated'); setTestRole(role); currentRef.current = coordinates; accuracyRef.current = 5; setCurrent(coordinates);
+    camera.current?.flyTo([coordinates.longitude, coordinates.latitude], 700);
     const sent = await publish(demoUser, coordinates, 5, true); if (sent) await refreshNearby(demoUser, coordinates);
     startPolling(demoUser);
   }, [publish, refreshNearby, startPolling]);

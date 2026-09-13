@@ -2,10 +2,37 @@
 
 ## Stage 4 readiness update — 2026-09-12
 
-No simulator, emulator, or physical device was launched during Stage 4, so none
-of the native runtime behavior below is represented as verified. The pending
-matrix and evidence requirements are in
-[device-validation.md](device-validation.md).
+A newly regenerated iOS Debug client was compiled with Xcode 26.3, installed on
+an iPhone 17 / iOS 26.5 Simulator, and exercised interactively. It launched from
+Metro, rendered the configured MapTiler style through native MapLibre, reached
+the simulator API at `127.0.0.1:3000`, displayed correct camera/location denial
+guidance, recovered after programmatic permission restoration, and retained the
+tested map/countdown/camera-workout states across background/foreground. Exact
+scope and caveats are in [device-validation.md](device-validation.md).
+
+No physical device or Android runtime was available. Simulator camera switching
+reached the expected no-front/no-back-hardware states, but there were no preview
+frames or MediaPipe landmarks. Settings-screen toggles, two-device presence and
+physical-device networking, result polling, and reward persistence therefore
+remain unverified at that target-device level.
+
+A second iOS 26.5 simulator was subsequently added to the run. Player A/B
+presence, both native map markers, challenge creation/acceptance, two-party
+configuration locking, shared start, and background/foreground recovery during
+the active challenge passed. A force-close/re-entry attempt then exposed that the
+server retained the 120-second invitation expiry after a five-minute match
+started. The start route now extends expiry through the 10-second countdown,
+configured match window, and 120-second result grace. Server tests pass, and a
+temporary updated server against the configured development database returned an
+active 300-second match with a 430-second TTL and kept it in the participant list.
+The native re-entry UI was not rerun against that temporary endpoint; it remains
+open in the checklist.
+
+The same run found that changing to Player A/B after the map had initialized
+updated the location but left the camera at the old GPS viewport because
+`defaultSettings` only applies at mount. The simulation selector now calls the
+native camera's `flyTo`; a live San Francisco-to-Houston switch passed without a
+remount.
 
 - `npm test`: passed, 123/123 tests.
 - `npm test --prefix server`: passed, 16/16 tests.
@@ -17,13 +44,20 @@ matrix and evidence requirements are in
 - `npx expo install --check`: passed using Expo's local SDK 54 dependency map;
   network lookup was unavailable. This check identified and Stage 4 updated
   `expo-device` from 7.0.3 to the SDK-compatible 8.0.10.
-- `npm run check:bundle`: passed for iOS (810 modules) and Android (818 modules).
+- `npm run check:bundle`: passed for iOS (820 modules) and Android (801 modules).
   The export listed all three Nunito faces and all avatar/navigation/workout PNG
   density variants. This remains JavaScript/asset evidence only.
 - `npm run prebuild`: passed without cleaning the generated projects. Generated
   iOS/Android files contain the foreground camera/location entries, microphone
   removal, and pose model. Existing non-blocking warnings remain: no custom app
   icon and `expo-system-ui` is not installed.
+- `pod install --project-directory=ios`: passed after prebuild; 96 dependencies
+  and 97 pods were installed, including Expo Device/Location/Font, MapLibre,
+  VisionCamera, Worklets, and MediaPipe.
+- Xcode 26.3 Simulator Debug build: passed and launched on iPhone 17 / iOS 26.5.
+- Xcode 26.3 generic iPhoneOS Debug build with code signing disabled: passed.
+- Android `:app:assembleDebug`: blocked before Gradle because no Java runtime is
+  installed; no Android build pass is claimed.
 
 Because Stage 4 changes permissions, EAS profiles, and the native `expo-device`
 dependency, a new development client must be built. The historical compiler/tool
@@ -38,8 +72,10 @@ in the exposed tool inventory. No [INTELLIGENCE] suggestions were present.
 Initial tree: original README plus untracked `.claude-flow/`, preserved.
 No generator was run over the repository root. No push, deploy or signing change.
 
-Node 24.18.0, npm 11.16.0, Xcode 26.6 (17F113), Swift 6.3.3, CocoaPods 1.17.0.
-Java runtime and adb were not available. No physical devices were tested.
+Node 24.18.0, npm 11.16.0, selected Xcode 26.6 (17F113), additional Xcode 26.3
+(17C529), and CocoaPods 1.17.0. The successful native builds used a per-command
+Xcode 26.3 selection. Java runtime, Android SDK, `adb`, emulator, and AVD were not
+available. `xcrun devicectl list devices` found no physical iOS device.
 
 ## Two-device presence test
 
@@ -77,18 +113,20 @@ device GPS” to return to normal foreground location behavior.
 
 ## Native compilation blockers
 
-**iOS:** unsigned `xcodebuild` command from README ran and failed in RN's bundled
-fmt 11.0.2 (`ios/Pods/fmt/include/fmt/format-inl.h`, lines 59, 60, 1387, 1391,
-1394): `call to consteval function ... is not a constant expression`. Exit 65.
-This is a compiler/dependency issue before app validation, not a signing failure.
-Local full log: `/tmp/nextrep-xcodebuild.log` (not a repository artifact).
+**iOS:** selected Xcode 26.6 still fails in RN's bundled fmt 11.0.2
+(`ios/Pods/fmt/include/fmt/format-inl.h`) with `call to consteval function ... is
+not a constant expression`. Xcode 26.3 is installed and is the validated local
+workaround: after regenerating and installing 97 pods, its iPhone 17 / iOS 26.5
+Simulator Debug build completed, installed, and launched. Its unsigned generic
+iPhoneOS Debug build also completed with `** BUILD SUCCEEDED **`. The local build
+logs/derived data used `/tmp/nextrep-stage4-simulator` and
+`/tmp/nextrep-stage4-device-build.log` / `/tmp/nextrep-stage4-device`.
 
 The observed failure matches the upstream
 [fmt report for Apple clang 21](https://github.com/fmtlib/fmt/issues/4740) and
 [React Native report](https://github.com/facebook/react-native/issues/55601).
-No speculative patch was applied to generated Pods. To retry with an older
-installed Xcode toolchain, use a per-command selection (does not change global
-settings), for example after installing Xcode 26.3 at that path:
+No speculative patch was applied to generated Pods. Use the validated older
+toolchain with a per-command selection (which does not change global settings):
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer \
@@ -97,17 +135,19 @@ DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer \
   -derivedDataPath /tmp/nextrep-derived-26-3 CODE_SIGNING_ALLOWED=NO
 ```
 
-That workaround is **not tested here**. If a phone requires a newer Xcode,
-integrate and validate the upstream fmt fix through a repeatable Expo config
-plugin/maintained patch before rebuilding. Preserve C++20 for RN/Worklets; do not
-globally downgrade C++ or claim that compiler flags alone fix fmt. Once native
-compilation passes, run `npm run ios` with your own signing team and phone.
+The same toolchain also built the Simulator target successfully. Generic-device
+compilation does not install, sign, or validate a phone. If a target phone
+requires newer Xcode, integrate and validate the upstream fmt fix through a
+repeatable Expo config plugin/maintained patch. Preserve C++20 for RN/Worklets;
+do not globally downgrade C++ or claim that compiler flags alone fix fmt. A
+signed `npm run ios` run with a team and connected phone is still required.
 
-**Android:** `cd android && ./gradlew :app:assembleDebug` was attempted and exits
-before Gradle with `Unable to locate a Java Runtime`. Install JDK 17 plus the
-Android prerequisites in README, set JAVA_HOME/ANDROID_HOME, then rerun that
-command and `npm run android`. CameraX/MediaPipe resolution and Android native
-compilation remain unverified.
+**Android:** `cd android && ./gradlew :app:assembleDebug` was attempted again and
+exited before Gradle with `Unable to locate a Java Runtime`. This host also has no
+Android SDK directory, `adb`, emulator, or AVD. Install JDK 17 plus the Android
+prerequisites in README, set `JAVA_HOME`/`ANDROID_HOME`, then rerun that command,
+`npm run android:emulator`, and `npm run android`. CameraX/MediaPipe resolution and
+Android native compilation remain unverified.
 
 Neither successful pod resolution nor JavaScript bundling proves native adapter
 compatibility. The adapter is now wired with the installed `usePoseDetection`

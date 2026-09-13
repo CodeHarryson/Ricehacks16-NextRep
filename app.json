@@ -38,7 +38,14 @@
       ],
       [
         "expo-location",
-        { "locationWhenInUsePermission": "NextRep uses your location to show approximate nearby demo users." }
+        {
+          "locationWhenInUsePermission": "NextRep uses your location to show approximate nearby demo users.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
       ]
     ],
     "extra": {

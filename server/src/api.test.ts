@@ -112,7 +112,12 @@ test('shared configuration validates, resets acceptance, reaches ready, and star
   const db = { query: async <T>(sql: string) => {
     if (sql.includes('UPDATE challenges SET exercise')) { current = { ...current, status: 'configuring', set_count: 2, config_version: Number(current.config_version) + 1, sender_accepted_at: null, receiver_accepted_at: null }; return { rows: [current as T], rowCount: 1 }; }
     if (sql.includes('UPDATE challenges SET') && sql.includes('sender_accepted_at = CASE')) { const caller = 'sender'; current = { ...current, sender_accepted_at: new Date() }; if (caller === current.receiver_id || current.receiver_accepted_at) current.status = 'ready'; return { rows: [current as T], rowCount: 1 }; }
-    if (sql.includes('UPDATE challenges SET') && sql.includes("status = 'active'")) { current = { ...current, status: 'active', started_at: new Date() }; return { rows: [current as T], rowCount: 1 }; }
+    if (sql.includes('UPDATE challenges SET') && sql.includes("status = 'active'")) {
+      assert.match(sql, /expires_at = GREATEST/);
+      assert.match(sql, /make_interval\(secs => match_time_limit_seconds \+ 130\)/);
+      current = { ...current, status: 'active', started_at: new Date() };
+      return { rows: [current as T], rowCount: 1 };
+    }
     if (sql.startsWith('UPDATE challenges SET status = \'expired\'')) return { rows: [], rowCount: 0 };
     if (sql.startsWith('SELECT * FROM challenges')) return { rows: [current as T], rowCount: 1 };
     return { rows: [], rowCount: 0 };

@@ -26,7 +26,13 @@ test('native configuration has only required foreground permissions and native p
   assert.deepEqual(config.android.blockedPermissions, ['android.permission.RECORD_AUDIO']);
   assert.ok(config.plugins.includes('expo-dev-client'));
   assert.ok(config.plugins.includes('@maplibre/maplibre-react-native'));
-  assert.ok(config.plugins.some((entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-location'));
+  const locationPlugin = config.plugins.find((entry: unknown) => Array.isArray(entry) && entry[0] === 'expo-location');
+  assert.ok(Array.isArray(locationPlugin));
+  assert.equal(locationPlugin[1].locationAlwaysAndWhenInUsePermission, false);
+  assert.equal(locationPlugin[1].locationAlwaysPermission, false);
+  assert.equal(locationPlugin[1].isIosBackgroundLocationEnabled, false);
+  assert.equal(locationPlugin[1].isAndroidBackgroundLocationEnabled, false);
+  assert.equal(locationPlugin[1].isAndroidForegroundServiceEnabled, false);
   assert.equal(app.newArchEnabled, false);
 });
 

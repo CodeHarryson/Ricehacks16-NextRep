@@ -5,7 +5,9 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
+    "ios:simulator": "expo run:ios",
     "ios": "expo run:ios --device",
+    "android:emulator": "expo run:android",
     "android": "expo run:android --device",
     "prebuild": "expo prebuild --no-install",
     "typecheck": "tsc --noEmit",

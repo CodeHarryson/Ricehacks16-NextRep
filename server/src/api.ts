@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { CHALLENGE_EXPIRY_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN, RESULT_MAX_FUTURE_SKEW_SECONDS, SESSION_COUNTDOWN_SECONDS } from './config.js';
+import { CHALLENGE_EXPIRY_SECONDS, CHALLENGE_RESULT_GRACE_SECONDS, NEARBY_RADIUS_METERS, PRESENCE_EXPIRY_SECONDS, CORS_ORIGIN, RESULT_MAX_FUTURE_SKEW_SECONDS, SESSION_COUNTDOWN_SECONDS } from './config.js';
 import { pool, type DbClient } from './db.js';
 import { quantizeCoordinate, validatePresence, type PresenceInput } from './validation.js';
 
@@ -188,7 +188,11 @@ export function createApp(db: DbClient = pool): Hono {
     const userId = context.req.header('x-user-id');
     if (!userId) return context.json({ error: 'x-user-id is required' }, 400);
     const result = await db.query<ChallengeRow>(
-      `UPDATE challenges SET status = 'active', started_at = COALESCE(started_at, NOW())
+      `UPDATE challenges SET status = 'active', started_at = COALESCE(started_at, NOW()),
+         expires_at = GREATEST(
+           expires_at,
+           COALESCE(started_at, NOW()) + make_interval(secs => match_time_limit_seconds + ${SESSION_COUNTDOWN_SECONDS + CHALLENGE_RESULT_GRACE_SECONDS})
+         )
        WHERE challenge_id = $1 AND (sender_id = $2 OR receiver_id = $2) AND status = 'ready'
          AND sender_accepted_at IS NOT NULL AND receiver_accepted_at IS NOT NULL AND expires_at > NOW() RETURNING *`, [context.req.param('id'), userId]);
     const started = result.rows[0];

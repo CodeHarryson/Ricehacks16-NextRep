@@ -91,8 +91,14 @@ implement the gameplay state machine independently in TypeScript.
 
 The evaluated Expo configuration includes foreground camera and location usage
 text on iOS, `CAMERA`, `ACCESS_FINE_LOCATION`, and `ACCESS_COARSE_LOCATION` on
-Android, and explicitly blocks audio recording. It requests no background
-location. The MapLibre config plugin, development client, VisionCamera permission
+Android, and explicitly blocks audio recording. The Expo Location plugin now
+sets both iOS Always permission strings, iOS background location, Android
+background location, and the Android location foreground service to `false`.
+This is necessary because the plugin otherwise generates Always usage strings
+from defaults even when the app only uses foreground location. Generated
+Info.plist now contains only `NSLocationWhenInUseUsageDescription`; generated
+Android configuration contains no background-location or location-service
+request. The MapLibre config plugin, development client, VisionCamera permission
 plugin, Expo Location plugin, and pose-model config plugin are all part of the
 generated native projects. `newArchEnabled=false` remains aligned with the
 MediaPipe adapter compatibility decision above.
@@ -115,3 +121,11 @@ React Native `require` calls with 1x/2x/3x files.
 Configuration and bundle checks do not prove native compilation or device
 behavior. The authoritative pending matrix is
 [device-validation.md](device-validation.md).
+
+On 2026-09-12, the regenerated pods and an Xcode 26.3 Debug build succeeded for
+an iPhone 17 / iOS 26.5 Simulator. The installed client launched, rendered the
+MapTiler style through native MapLibre, reached the local API, showed the expected
+permission diagnostics, and survived the simulator recovery cases recorded in
+the matrix. This removes the prior Xcode 26.6/fmt blocker for the documented 26.3
+toolchain; it does not validate signing, physical cameras, MediaPipe landmarks,
+Android compilation, or either physical platform.

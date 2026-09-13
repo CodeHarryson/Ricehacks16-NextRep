@@ -35,15 +35,25 @@ scaffolded in place; its original README text and `.claude-flow` are preserved.
 ### iPhone (Mac required)
 
 Install Xcode and its iOS platform, select Xcode in Settings → Locations → Command
-Line Tools, accept its license, and install CocoaPods. This host has Xcode 26.6,
-Swift 6.3.3 and CocoaPods 1.17.0. Minimum phone OS is iOS 15.1.
+Line Tools, accept its license, and install CocoaPods. This host has Xcode 26.6
+selected, Xcode 26.3 at `/Applications/Xcode_26.3.app`, and CocoaPods 1.17.0.
+The rebuilt client compiles with Xcode 26.3; Xcode 26.6 still hits the documented
+React Native/fmt compiler incompatibility. Minimum phone OS is iOS 15.1.
 
 ```sh
 npm run prebuild
 pod install --project-directory=ios
-npm run ios
+
+# iOS Simulator (validated locally with Xcode 26.3):
+DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer \
+  npm run ios:simulator
+
+# Connected physical iPhone (select the device when prompted):
+DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer \
+  npm run ios
+
 # Later JS-only sessions, after the development app is installed:
-npm start
+npx expo start --dev-client --lan --clear
 ```
 
 Cloud development-build commands (after EAS login and profile environment setup):
@@ -80,10 +90,16 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 java -version
 adb devices
 npm run prebuild
+
+# Start an AVD first, then build/install on the Android Emulator:
+npm run android:emulator
+
+# Connected physical Android device (select it when prompted):
 npm run android
+
 # Optional USB Metro connection:
 adb reverse tcp:8081 tcp:8081
-npm start
+npx expo start --dev-client --lan --clear
 ```
 
 Cloud Android development build:
@@ -94,7 +110,9 @@ npx eas-cli@latest build --profile development --platform android
 
 Enable USB debugging and accept the computer authorization on the phone. Linux
 and Windows developers should use their local JDK/SDK paths. Standalone native
-check: `cd android && ./gradlew :app:assembleDebug`.
+check: `cd android && ./gradlew :app:assembleDebug`. The Android Emulator must
+use `EXPO_PUBLIC_ANDROID_EMULATOR_API_URL=http://10.0.2.2:3000`; physical Android
+uses the LAN `EXPO_PUBLIC_API_URL` just like a physical iPhone.
 
 ## Selected versions
 
